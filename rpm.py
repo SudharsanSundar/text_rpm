@@ -229,13 +229,13 @@ def check_all_items_unique(items):
             num_duplicates += 1
 
     print('-'*100)
-    print('Finished checking for duplicates. Total num duplicates found:', num_duplicates)
+    print(f'Finished checking for duplicates. Total num items: {len(items)}. Total num duplicates found: {num_duplicates}')
     print('-' * 100)
 
 
 def main():
     maker = RPMMaker()
-    attribute_seq, problem_abstraction = maker.generate_random_problem(
+    attributes, problem_abstraction = maker.generate_random_problem(
         attribute_to_rule={'shape_type': 'progression',
                            'shape_color': 'constant',
                            'shape_size': 'progression'},
@@ -244,7 +244,7 @@ def main():
                              'shape_size': ['G', 'H', 'I']},
     )
 
-    prompt, answer = maker.make_prompt(attribute_seq, problem_abstraction)
+    prompt, answer = maker.make_prompt(attributes, problem_abstraction)
     print(prompt)
     print(answer)
 
