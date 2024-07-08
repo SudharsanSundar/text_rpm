@@ -7,12 +7,13 @@ Row 1: {row1}
 Row 2: {row2}
 Row 3: {row3}
 
-Please determine the correct values for the final tuple of Row 3, (?, ?, ?), which completes the pattern.'''
+Please determine the correct values for the final tuple of Row 3, {mystery_tuple}, which completes the pattern.'''
 
 SUPPORTED_RULES = ['constant', 'progression', 'distribute_3']
 SUPPORTED_NUM_UNIQUE_VALUES = 3
 
 
+# TODO: Tuples might be making things too easy. A more realistic test might be to *concatenate* everything, so you see "ABC" rather than "(A, B, C)". Then, you have to tease it apart, rather than being handed the "parsed" tuple.
 class RPMMaker:
     def __init__(self):
         pass
@@ -23,7 +24,8 @@ class RPMMaker:
         possible_empty_characters = ['*', '_']
         assert len(set(possible_empty_characters) - set(str(problem_abstraction))) > 0
         chosen_empty_character = list(set(possible_empty_characters) - set(str(problem_abstraction)))[0]
-        empty_form_values = [chosen_empty_character for i in range(len(attributes))]
+        empty_form_values = [chosen_empty_character] * len(attributes)
+        mystery_tuple = ['?'] * len(attributes)
 
         # Prepare the answer text and prompt text
         answer = RPMMaker.format_elem(problem_abstraction[2][2])
@@ -33,7 +35,8 @@ class RPMMaker:
             attribute_tuple=RPMMaker.format_elem(cleaned_attributes),
             row1=RPMMaker.format_row(problem_abstraction[0]),
             row2=RPMMaker.format_row(problem_abstraction[1]),
-            row3=RPMMaker.format_row(problem_abstraction[2][:-1] + [['?', '?', '?']]),
+            row3=RPMMaker.format_row(problem_abstraction[2][:-1] + [mystery_tuple]),
+            mystery_tuple=RPMMaker.format_elem(mystery_tuple)
         )
 
         return prompt, answer
@@ -121,10 +124,12 @@ class RPMMaker:
 
     @staticmethod
     def generate_all_unique_problems_from_rules(attribute_to_rule: dict,
-                                                attribute_to_values: dict = None):
+                                                attribute_to_values: dict = None,
+                                                max_num_rule_configs_tried: int = 10000):
         """
         :param attribute_to_rule: dict, what rule to apply to the given attribute
         :param attribute_to_values: optional dict, what values to use for the given attribute
+        :param max_num_rule_configs_tried: maximum number of alternative configurations (i.e. random seeding of each rule "token") of the specified problem to try
 
         :return: attribute list, list of RPM abstractions
 
@@ -145,11 +150,11 @@ class RPMMaker:
         attributes = list(attribute_to_rule.keys())
         assert len(set(attributes)) == len(attributes)
 
-        total_num_unique = 6 ** len(attributes) * 2 ** sum(1 for attribute in attributes if attribute == 'distribute_3')     # Relies on the fact that there are only 3 unique values per attribute in the entire matrix
+        total_num_unique = 6 ** len(attributes) * 2 ** sum(1 for attribute in attributes if attribute_to_rule[attribute] == 'distribute_3')     # Relies on the fact that there are only 3 unique values per attribute in the entire matrix
 
         all_abstractions = []
-        rule_configs = RPMMaker.get_all_rule_configs(attributes)   # Relies on the fact that there are only 3 unique values per attribute
-        assert total_num_unique == len(rule_configs)
+        rule_configs = RPMMaker.get_all_rule_configs(attributes, attribute_to_rule, max_num_rule_configs_tried)   # Relies on the fact that there are only 3 unique values per attribute
+        assert total_num_unique >= len(rule_configs)        # Allows for capping the max tried. In smaller scale testing, worked fine.
 
         # Go through each possible unique configuration/application of the rules
         assert len(set([rule for rule in attribute_to_rule.values()]) - set(SUPPORTED_RULES)) == 0
@@ -170,29 +175,31 @@ class RPMMaker:
                                                                             attribute_to_values)
             all_abstractions.append(final_grid_abstraction)
 
-        all_abstractions = RPMMaker.get_rid_of_duplicate_items(all_abstractions)
+        # all_abstractions = RPMMaker.get_rid_of_duplicate_items(all_abstractions)
 
         return attributes, all_abstractions
 
     @staticmethod
-    def get_all_rule_configs(attributes):
+    def get_all_rule_configs(attributes, attribute_to_rule, max_num_configs):
         all_configs = []
 
         def compute_config_variations(attr_idx, config, configs):
+            if len(configs) >= max_num_configs:
+                return
             if attr_idx == len(attributes):
                 configs.append(config)
             else:
                 attribute = attributes[attr_idx]
                 order_permutations = list(itertools.permutations([i for i in range(3)]))
 
-                if attributes[attr_idx] != 'distribute_3':
+                if attribute_to_rule[attributes[attr_idx]] != 'distribute_3':
                     for order_permutation in order_permutations:
                         new_config = {} if config is None else config.copy()
                         new_config[attribute] = {}
                         new_config[attribute]['order'] = order_permutation
 
                         compute_config_variations(attr_idx + 1, new_config, configs)
-                elif attributes[attr_idx] == 'distribute_3':
+                elif attribute_to_rule[attributes[attr_idx]] == 'distribute_3':
                     sign_permutations = [-1, 1]
                     for order_permutation in order_permutations:
                         for sign_permutation in sign_permutations:
@@ -239,9 +246,9 @@ def main():
         attribute_to_rule={'shape_type': 'progression',
                            'shape_color': 'constant',
                            'shape_size': 'progression'},
-        attribute_to_values={'shape_type': ['A', 'B', 'C'],
-                             'shape_color': ['D', 'E', 'F'],
-                             'shape_size': ['G', 'H', 'I']},
+        attribute_to_values={'shape_type': ['!', 'A', '#'],
+                             'shape_color': ['D', '@', 'F'],
+                             'shape_size': ['&', 'H', '^']},
     )
 
     prompt, answer = maker.make_prompt(attributes, problem_abstraction)
