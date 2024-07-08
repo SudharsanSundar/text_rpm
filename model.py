@@ -43,17 +43,28 @@ class APIModel:
         self.model_name = model_name
         self.org = org
 
-    # @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=60), reraise=True)
-    def get_answer_text(self, prompt, system_prompt='You are a helpful assistant.', max_tokens=1024):
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=60), reraise=True)
+    def get_answer_text(self, prompt, system_prompt='You are a helpful assistant.', max_tokens=1024, stop_seqs=None):
         if self.org == 'together':
-            response = together_client.chat.completions.create(
-                model=self.model_name,
-                messages=[{'role': 'user', 'content': prompt}],
-                max_tokens=max_tokens,
-                top_p=0.0,
-                top_k=1,
-                temperature=0
-            )
+            if stop_seqs is None:
+                response = together_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[{'role': 'user', 'content': prompt}],
+                    max_tokens=max_tokens,
+                    top_p=0.0,
+                    top_k=1,
+                    temperature=0
+                )
+            else:
+                response = together_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[{'role': 'user', 'content': prompt}],
+                    max_tokens=max_tokens,
+                    top_p=0.0,
+                    top_k=1,
+                    temperature=0,
+                    stop=stop_seqs
+                )
 
             return response.choices[0].message.content
         else:

@@ -13,7 +13,10 @@ def score_breakdown(eval_results_fp, model_name):
             'total_num_rules': {},
             'num_nonconstant_rules': {},
             'num_distribute_3_rules': {},
-            'num_unique_rules': {}
+            'num_unique_rules': {},
+            'num_unparsable_answers': 0,
+            'num_parsed_but_incorrectly_formatted_answers': 0,
+            'num_formatted_but_incorrect_shape_answer': 0
         }
         total_in_category = {
             'total_num_rules': {},
@@ -21,8 +24,6 @@ def score_breakdown(eval_results_fp, model_name):
             'num_distribute_3_rules': {},
             'num_unique_rules': {}
         }
-        num_dud_answers = 0
-        num_incorrect_elems = 0
 
         for result in results:
             num_rules = len(result['problem_characteristics']['attribute_to_rule'].values())
@@ -41,7 +42,9 @@ def score_breakdown(eval_results_fp, model_name):
             score_breakdown_results['num_unique_rules'][num_unique_rules] = score_breakdown_results['num_unique_rules'].get(num_unique_rules, 0) + result['score']
 
             extracted_answer = result['extracted_answer']
-            if not (extracted_answer[0] == '('
+            if extracted_answer == 'Could not parse answer.':
+                score_breakdown_results['num_unparsable_answers'] += 1
+            elif not (extracted_answer[0] == '('
                     and extracted_answer[-1] == ')'
                     and all(65 <= ord(extracted_answer[i]) <= 65 + 26 for i in range(1, len(extracted_answer), 3))      # Assumes alphabet is capital English letters
                     and all(extracted_answer[i:i + 2] == ', ' for i in range(2, len(extracted_answer) - 1, 3))):
@@ -52,14 +55,15 @@ def score_breakdown(eval_results_fp, model_name):
                 print('FULL model answer:')
                 print(result['model_answer'])
                 print('-'*100)
-                num_dud_answers += 1
+                score_breakdown_results['num_parsed_but_incorrectly_formatted_answers'] += 1
             elif len(extracted_answer.split(',')) != len(result['correct_answer'].split(',')):
-                num_incorrect_elems += 1
+                score_breakdown_results['num_formatted_but_incorrect_shape_answer'] += 1
 
     print('SCORE BREAKDOWN')
     print('Total answers:', len(results))
-    print('Total num dud answers:', num_dud_answers)
-    print('Total num incorrect elem format answers:', num_incorrect_elems)
+    print('Total num unparsable answers:', score_breakdown_results['num_unparsable_answers'])
+    print('Total num incorrectly formatted answers:', score_breakdown_results['num_parsed_but_incorrectly_formatted_answers'])
+    print('Total num incorrectly shaped answers:', score_breakdown_results['num_formatted_but_incorrect_shape_answer'])
     print('- - - Absolute total num problems:')
     ppr.pprint(total_in_category)
     print('- - - Absolute correct:')
@@ -80,17 +84,21 @@ def score_breakdown(eval_results_fp, model_name):
         ax.set_ylabel('Fraction of problems correct')
         ax.set_title(category)
 
-    title = f'custom RPM eval results for {model_name}'
+    title = f'rpm eval analysis/{model_name}'
     fig.suptitle(title)
     plt.tight_layout()
 
-    save_fp = '_'.join(title.replace('/', '-').split(' ')) + '.png'
-    plt.savefig(save_fp, dpi=300)
+    save_fp = '_'.join(title.replace('/', '-').split(' '))
+    plt.savefig(save_fp + '.png', dpi=300)
     plt.show()
+
+    score_breakdown_results['fraction_correct'] = fraction_correct
+    with open(save_fp + '.json', 'w') as f:
+        json.dump(score_breakdown_results, f)
 
 
 def main():
-    score_breakdown('rpm_eval_results_meta-llama-Llama-3-8b-hf.json', 'meta-llama-Llama-3-8b-hf')
+    score_breakdown('rpm_eval_results_meta-llama-Llama-3-8b-hf_old.json', 'meta-llama-Llama-3-8b-hf')
 
 
 if __name__ == '__main__':

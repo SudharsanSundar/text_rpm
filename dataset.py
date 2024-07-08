@@ -20,7 +20,14 @@ DEFAULT_ATTRIBUTES = ('shape_type',
                       'inner_shape_position',
                       'inner_shape_count')
 SUPPORTED_RULES = ('constant', 'progression', 'distribute_3')
-DEFAULT_SAMPLING = {'base_num_exs': 10000, '0_num_noncons_rules_prob': 0.1, '1_num_noncons_rules_prob': 0.1, '2_num_noncons_rules_prob': 0.3, '3_num_noncons_rules_prob': 0.3, '4_num_noncons_rules_prob': 0.3, '5_num_noncons_rules_prob': 0.3}
+DEFAULT_SAMPLING = {'base_num_exs': 10000,
+                    '0_num_noncons_rules_prob': 0.1,
+                    '1_num_noncons_rules_prob': 0.1,
+                    '2_num_noncons_rules_prob': 0.3,
+                    '3_num_noncons_rules_prob': 0.3,
+                    '4_num_noncons_rules_prob': 0.3,
+                    '5_num_noncons_rules_prob': 0.3,
+                    '6_num_noncons_rules_prob': 0.3}
 
 
 class RPMDataset:
@@ -307,9 +314,6 @@ def main():
     dataset.generate_dataset()
     # dataset.load_dataset('default_rpm_dataset.json')
     dataset.create_eval_problem_set()
-
-    # dataset = RPMDataset()
-    # dataset.generate_dataset()
 
 
 if __name__ == '__main__':
