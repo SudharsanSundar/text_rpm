@@ -91,21 +91,21 @@ def eval_model_on_rpm(model_name, model_org, eval_dataset_path, results_save_fol
 
 def main():
     # Size ~1.5B
-    # # Raw
-    eval_model_on_rpm(model_name='Qwen/Qwen1.5-1.8B',
-                      model_org='together',
-                      api=True,
-                      stop_seqs=['''system'''],
-                      eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-                      results_save_folder='results/',
-                      limit_num_problems={'method': 'first_x', 'num_problems': 1000})
-    # # Chat
-    eval_model_on_rpm(model_name='Qwen/Qwen1.5-1.8B-Chat',      # Answers are significantly dumber than base model, based on looking at a few initial answers
-                      model_org='together',
-                      api=True,
-                      eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-                      results_save_folder='results/',
-                      limit_num_problems={'method': 'first_x', 'num_problems': 1000})
+    # # Raw | ~30? / 1000 (easy) problems (~0.03 min per problem); 38 / 1000 = 3.8% correct
+    # eval_model_on_rpm(model_name='Qwen/Qwen1.5-1.8B',
+    #                   model_org='together',
+    #                   api=True,
+    #                   stop_seqs=['''system'''],
+    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
+    #                   results_save_folder='results/',
+    #                   limit_num_problems={'method': 'first_x', 'num_problems': 1000})
+    # # # Chat | ~25 min / 1000 (easy) problems (~0.025 min per problem); 23 / 1000 = 2.3% correct
+    # eval_model_on_rpm(model_name='Qwen/Qwen1.5-1.8B-Chat',      # Answers are significantly dumber than base model, based on looking at a few initial answers
+    #                   model_org='together',
+    #                   api=True,
+    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
+    #                   results_save_folder='results/',
+    #                   limit_num_problems={'method': 'first_x', 'num_problems': 1000})
 
     # # Size ~7B
     # # # Mistral
@@ -125,29 +125,38 @@ def main():
     #                   results_save_folder='results/',
     #                   limit_num_problems=None)
     # # # # Chat
+    # # # # # Full eval
     # eval_model_on_rpm(model_name='meta-llama/Llama-3-8b-chat-hf',
     #                   model_org='together',
     #                   api=True,
     #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
     #                   results_save_folder='results/',
     #                   limit_num_problems=None)
+    # # # # Chat
+    # # # # # Easy subset
+    # eval_model_on_rpm(model_name='meta-llama/Llama-3-8b-chat-hf',
+    #                   model_org='together',
+    #                   api=True,
+    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
+    #                   results_save_folder='results/',
+    #                   limit_num_problems={'method': 'first_x', 'num_problems': 1000})
     #
-    # # Size ~70B
-    # # # LLaMA
-    # # # # Raw
+    # Size ~70B
+    # # LLaMA
+    # # # Raw / Wasn't answering question. Need few-shot prompt in order to do this.
     # eval_model_on_rpm(model_name='meta-llama/Meta-Llama-3-70B',
     #                   model_org='together',
     #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
+    #                   eval_dataset_path='rpm_eval_dataset_eval_problems_old.json',
     #                   results_save_folder='results/',
     #                   limit_num_problems=None)
-    # # # # Chat
-    # eval_model_on_rpm(model_name='meta-llama/Llama-3-70b-chat-hf',
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems=None)
+    # # # # Chat | ~354.6 min / 8942 problems (~0.04 min per problem); 6554 / 8942 = 73.29% correct
+    eval_model_on_rpm(model_name='meta-llama/Llama-3-70b-chat-hf',
+                      model_org='together',
+                      api=True,
+                      eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
+                      results_save_folder='results/',
+                      limit_num_problems=None)
 
 
 if __name__ == '__main__':
