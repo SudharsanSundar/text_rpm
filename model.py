@@ -1,6 +1,6 @@
 import together
 from tenacity import retry, stop_after_attempt, wait_exponential
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, PretrainedConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, PretrainedConfig, Qwen2Config, LlamaConfig
 import pprint as ppr
 
 TOGETHER_API_KEY = '146706bab46d0101232eb1519664fb6e53c5be853f85aae3cfa9abd266e9434d'
@@ -66,6 +66,9 @@ base_model_name_to_path = {path.split('/')[-1]: path for path in base_model_dire
 chat_model_name_to_path = {path.split('/')[-1]: path for path in chat_model_directories}
 all_model_name_to_path = {**base_model_name_to_path, **chat_model_name_to_path}
 
+# TODO: Need to map model family to Config type
+# TODO: Need to map model family to instruct prompt format
+
 
 class APIModel:
     def __init__(self, model_name, org='together'):
@@ -101,45 +104,59 @@ class APIModel:
 
 
 class ClusterModel:
-    def __init__(self, model_name, temperature=0, top_p=0, top_k=1, max_len=1024, output_scores=False):
-        self.model_name = model_name
-        self.model_path = all_model_name_to_path[model_name]
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_path,
-                                                          device_map="auto",
-                                                          torch_dtype="auto",
-                                                          trust_remote_code=True).eval()
+    def __init__(self, model_name_or_path, temperature=0, top_p=0, top_k=1, max_new_tokens=1024, output_scores=False):
+        if '/' in model_name_or_path:
+            self.model_name = model_name_or_path.split('/')[-1]
+            self.model_path = model_name_or_path
+        else:
+            self.model_name = model_name_or_path
+            self.model_path = all_model_name_to_path[model_name_or_path]
+        
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_path,
                                                        use_fast=False,
                                                        padding_side='left',
                                                        trust_remote_code=True)
-        self.config = PretrainedConfig().from_pretrained(self.model_path)
-        self.config.temperature = temperature
-        self.config.top_p = top_p
-        self.config.top_k = top_k
-        self.max_length = max_len
+        self.config = LlamaConfig().from_pretrained(self.model_path)            # TODO: Automatically choose the right Config object
+        self.config.do_sample = False   # Sets generation to greedy decoding, i.e. temp=0 i.e. top_p=0, i.e. top_k=1
+        self.config.max_new_tokens = max_new_tokens
         self.config.output_scores = output_scores  # Set to True if you want model generations to output logits as well
+        print(self.config)
+        self.model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path=self.model_path,
+                                                          device_map="auto",
+                                                          torch_dtype="auto",
+                                                          trust_remote_code=True,
+                                                          config=self.config).eval()
         self.inference_pipeline = pipeline(task='text-generation',
                                            model=self.model,
                                            tokenizer=self.tokenizer,
-                                           config=self.config)
+                                           config=self.config,
+                                           do_sample=False,
+                                           temperature=None,
+                                           top_p=None,
+                                           top_k=None)
+        print('Initialized ClusterModel')
 
-    def get_answer_text(self, prompt, system_prompt=None, max_tokens=1024):
+    def get_answer_text(self, prompt, system_prompt=None, max_new_tokens=1024):
+        # TODO: Automatically format the prompt in instruction format based on the model family
+        # TODO: Consider batching if input length is highly regular to increase throughput
+        # TODO: Look back at Gene's implementation to see how mine compares
         generation = self.inference_pipeline(prompt)
+        print('GENERATION\n', generation)
 
-        return generation[0]['generated_text']
+        return generation[0]['generated_text'][len(prompt):]
 
 
 def main():
-    print()
-    test_model = ClusterModel('Qwen2-0.5B-Instruct')
-    test_model.get_answer_text(prompt='You have reached your destination: reality. Please state your name.')
+    print('Starting script...')
+    test_model = ClusterModel('Meta-Llama-3-8B-Instruct')
+    '''<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+What is France's capital?<|eot_id|><|start_header_id|>assistant<|end_header_id|>'''
+    print(test_model.get_answer_text(prompt='<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\nConsider the following pattern. Each tuple (*) represents (shape type).\nRow 1: (C), (B), (A)\nRow 2: (A), (C), (B)\nRow 3: (B), (A), (?)\n\nPlease determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as \"The final answer is: [your final answer].\"<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>'))
 
     # TODO: Check to make sure that generation works as intended
     # TODO: Make sure parsing pipeline works as intended
     # TODO: Do small test and make sure eval works right end to end
-
-    
-
 
 
 if __name__ == '__main__':
