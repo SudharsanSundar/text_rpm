@@ -208,8 +208,9 @@ def main():
     # score_breakdown('results/rpm_eval_results_meta-llama-Llama-3-8b-chat-hf_old.json', 'meta-llama/Llama-3-8b-chat-hf', save_folder='analysis/')
     # score_breakdown('results/rpm_eval_results_Qwen-Qwen1.5-1.8B.json', 'Qwen/Qwen1.5-1.8B')
     # score_breakdown('results/rpm_eval_results_Qwen-Qwen1.5-1.8B-Chat.json', 'Qwen/Qwen1.5-1.8B-Chat')
-    score_breakdown('results/rpm_eval_results_meta-llama-Llama-3-70b-chat-hf_old.json',
-                    'meta-llama-Llama-3-70b-chat-hf', save_folder='analysis/')
+    # score_breakdown('results/rpm_eval_results_meta-llama-Llama-3-70b-chat-hf_old.json',
+    #                 'meta-llama-Llama-3-70b-chat-hf', save_folder='analysis/')
+    score_breakdown('results/rpm_eval_results_Qwen2-0.5B-Instruct.json', 'Qwen2-0.5B-Instruct')
 
 
 if __name__ == '__main__':

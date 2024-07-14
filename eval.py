@@ -7,6 +7,7 @@ import re
 import tiktoken
 import time
 import argparse
+import pprint as ppr
 
 gpt4_tokenzier = tiktoken.encoding_for_model('gpt-4')
 random.seed(42)
@@ -116,12 +117,28 @@ def eval_model_on_rpm_batched(model_name_or_path,
         print(f'NOTE: Taking {limit_num_problems} to use out of all given eval problems.')
         if limit_num_problems['method'] == 'sample':
             eval_problems = random.sample(eval_problems, k=limit_num_problems['num_problems'])
-        if limit_num_problems['method'] == 'first_x':
+        elif limit_num_problems['method'] == 'first_x':
             eval_problems = eval_problems[:limit_num_problems['num_problems']]
+        else:
+            raise ValueError('Currenrtly, the only valid methods for limiting number of problems is \'sample\' (randomly sample from all problems) and \'first_x\' (take the first x problems, often roughly the x easiest problems)')
 
     results = []
     total_score = 0
     start_time = time.time()
+
+    base_path = '/data/sudharsan_sundar/text_rpm/'
+    save_path = 'rpm_eval_results_' + model.model_name.replace('/', '-') + '.json'
+    if results_save_folder is not None:
+        save_path = results_save_folder + save_path
+    save_path = base_path + save_path
+    # try:
+    #     with open(save_path, 'r') as f:
+    #         print('WARNING: Already some file at save location. Overwriting...')
+    #     with open(save_path, 'w') as f:
+    #         print('Overwritten.')
+    # except:
+    #     print('No existing save file detecting. Will save to new file.')
+    
     if use_hf_pipeline:
         model_answers = model.get_answer_text_batched(eval_problems)
 
@@ -152,11 +169,10 @@ def eval_model_on_rpm_batched(model_name_or_path,
             print(result['score'], '|', total_score, '/', len(results))
             print('-'*100)
     else:
-        model_answers = []
         for i in range(0, len(eval_problems), batch_size):
             new_eval_problems = eval_problems[i:min(i + batch_size, len(eval_problems))]
-            new_model_answers = model.get_answer_text_batched_alt(new_eval_problems)
-            model_answers += new_model_answers
+            new_model_answers = model.get_answer_text_batched_alt([new_eval_problem['problem_prompt'] for new_eval_problem in new_eval_problems])
+            new_results = []
 
             for problem, model_answer in zip(new_eval_problems, new_model_answers):
                 prompt = problem['problem_prompt']
@@ -173,6 +189,7 @@ def eval_model_on_rpm_batched(model_name_or_path,
                 }
 
                 results.append(result)
+                new_results.append(result)
                 total_score += result['score']
 
                 print('PROMPT')
@@ -185,9 +202,10 @@ def eval_model_on_rpm_batched(model_name_or_path,
                 print(result['score'], '|', total_score, '/', len(results))
                 print('-'*100)
 
-    save_path = 'rpm_eval_results_' + model.model_name.replace('/', '-') + '.json'
-    if results_save_folder is not None:
-        save_path = results_save_folder + save_path
+            with open(save_path, 'a') as f:
+                for result in new_results:
+                    f.write(json.dumps(result) + '\n')
+
     with open(save_path, 'w') as f:
         for result in results:
             f.write(json.dumps(result) + '\n')
@@ -197,18 +215,18 @@ def eval_model_on_rpm_batched(model_name_or_path,
     if results_save_folder is not None:
         save_path = results_save_folder + save_path
     with open(save_path, 'w') as f:
-        json.dump(totals)
+        json.dump(totals, f, indent=4)
 
     print(f'TOTAL SCORE: {total_score} / {len(eval_problems)} problems correct ({total_score / len(eval_problems)})')
     print(f'TOTAL TIME TAKEN FOR EVAL: {(time.time() - start_time) / 60} min ({(time.time() - start_time) / (60 * len(eval_problems))} min on avg per problem)')
 
 
-def main(model_name, use_api, eval_dataset_path, results_save_folder, limit_num_problems, batch_size, use_hf_pipeline):
+def main():     # scancel ss__text-rpm_eval
     parser = argparse.ArgumentParser(description='Evaluate models on text RPM problems using batched inputs.')
-    parser.add_argument('model_name_or_path', type=str, help='Name of model or path to model to evaluate.')
-    parser.add_argument('eval_dataset_path', type=str, help='Path to eval problems from text rpm dataset.')
-    parser.add_argument('results_save_folder', type=str, help='Path to folder to save results in.')
-    parser.add_argument('batch_size', type=int, help='Batch size to use when doing model inference.')
+    parser.add_argument('--model_name_or_path', type=str, required=True, help='Name of model or path to model to evaluate.')
+    parser.add_argument('--eval_dataset_path', type=str, required=True, help='Path to eval problems from text rpm dataset.')
+    parser.add_argument('--results_save_folder', type=str, required=True, help='Path to folder to save results in.')
+    parser.add_argument('--batch_size', type=int, required=True, help='Batch size to use when doing model inference.')
     parser.add_argument('--limit_num_problems', type=str, default=None, help='Whether to use a subset of problems for testing. Format as \'method,num_problems\', such as \'first_x,100\'.')
     parser.add_argument('--use_hf_pipeline', type=bool, default=False, help='Whether to use the HF pipeline class to conduct inference, or use a custom implementation.')
     parser.add_argument('--use_api', type=bool, default=False, help='Whether to use a model API. Not yet implemented.')
@@ -218,7 +236,7 @@ def main(model_name, use_api, eval_dataset_path, results_save_folder, limit_num_
                               eval_dataset_path=args.eval_dataset_path,
                               results_save_folder=args.results_save_folder,
                               batch_size=args.batch_size,
-                              limit_num_problems=args.limit_num_problems,
+                              limit_num_problems={'method': args.limit_num_problems.split(',')[0], 'num_problems': int(args.limit_num_problems.split(',')[1])},
                               use_hf_pipeline=args.use_hf_pipeline,
                               api=args.use_api,)
     
