@@ -13,6 +13,7 @@ DEFAULT_ATTRIBUTES = ('shape_type',
                       'shape_orientation',
                       'shape_texture',
                       'shape_position',
+                      'shape_count',
                       'inner_shape_color',
                       'inner_shape_size',
                       'inner_shape_orientation',
@@ -27,7 +28,8 @@ DEFAULT_SAMPLING = {'base_num_exs': 10000,
                     '3_num_noncons_rules_prob': 0.3,
                     '4_num_noncons_rules_prob': 0.3,
                     '5_num_noncons_rules_prob': 0.3,
-                    '6_num_noncons_rules_prob': 0.3}
+                    '6_num_noncons_rules_prob': 0.3,
+                    'unspecified_num_noncons_rules_prob': 0.3}  # Just explicitly stating what's happening in the code, this value isn't directly used
 
 
 class RPMDataset:
@@ -95,14 +97,14 @@ class RPMDataset:
     def __init__(self,
                  min_rules=1,
                  max_rules=6,
-                 max_constant_adds=3,
+                #  max_constant_adds=3,
                  alphabet=DEFAULT_ALPHABET,
                  all_attributes=DEFAULT_ATTRIBUTES,
                  ruleset=SUPPORTED_RULES,
                  sampling_scheme=None):
         self.min_num_rules = min_rules
         self.max_num_rules = max_rules
-        self.max_constant_additions = max_constant_adds     # TODO: Not used rn, since we add some constants by default with having it as one of the rules. Also, don't think this would change much.
+        # self.max_constant_additions = max_constant_adds     # TODO: Not used rn. Also, don't think this would change much.
 
         self.alphabet = alphabet
         assert 'type' in all_attributes[0]
@@ -123,6 +125,7 @@ class RPMDataset:
     def generate_dataset(self):
         final_problems = {}
         total_num_problems = 0
+        rpmmaker = RPMMaker()
         for num_rules in range(self.min_num_rules, self.max_num_rules + 1, 1):
             print(self.alphabet, 'NUM RULES NOW', num_rules)
 
@@ -143,13 +146,12 @@ class RPMDataset:
 
                 attribute_to_rule = {attribute: rule for attribute, rule in zip(attributes, rule_combo)}
                 attribute_to_values = {attribute: values for attribute, values in zip(attributes, self.alphabet)}
+                
+                attributes_out, all_problems = rpmmaker.generate_all_unique_problems_from_rules(attribute_to_rule, attribute_to_values)     # 10k search max. Consider making randomization better.
 
-                rpmmaker = RPMMaker()
-                attributes_out, all_problems = rpmmaker.generate_all_unique_problems_from_rules(attribute_to_rule, attribute_to_values)     # 10k search max
-
-                # Take some subset of these problem instances
+                # Take some subset of these problem instances. Current scheme tries include maximum diversity of rule_combos, taking very small numbers from each combo.
                 num_nonconstant_rules = sum(1 for rule in attribute_to_rule.values() if rule != 'constant')
-                num_problems_used = min(len(all_problems), max(int((self.sampling_scheme['base_num_exs'] * self.sampling_scheme[f'{num_nonconstant_rules}_num_noncons_rules_prob'] + 1) / len(all_rule_combos)), 1))
+                num_problems_used = min(len(all_problems), max(4, int((self.sampling_scheme['base_num_exs'] * self.sampling_scheme.get(f'{num_nonconstant_rules}_num_noncons_rules_prob', 0.3) + 1) / len(all_rule_combos))))
                 print('num used', num_problems_used)
                 all_problems_used = random.sample(all_problems, k=num_problems_used)
 
@@ -198,10 +200,7 @@ class RPMDataset:
             self.full_dataset = saved['full_dataset']
             self.len_dataset = saved['len_dataset']
 
-    def create_eval_problem_set(self, path_base=None, max_num_problems_per_category=None):
-        if max_num_problems_per_category is None:
-            max_num_problems_per_category = 2000
-
+    def create_eval_problem_set(self, max_num_problems_per_category=100):
         flattened_dataset = {}
         for num_rules in self.full_dataset:
             rule_segment = self.full_dataset[num_rules]
@@ -236,13 +235,13 @@ class RPMDataset:
         for num_rules in flattened_dataset:
             print(num_rules, len(flattened_dataset[num_rules]))
             eval_problems += random.sample(flattened_dataset[num_rules], k=min(len(flattened_dataset[num_rules]), max_num_problems_per_category))
+            print(len(eval_problems))
 
         self.eval_dataset = eval_problems
         self.eval_dataset_len = len(eval_problems)
         print('Eval dataset length:', self.eval_dataset_len)
 
-        if path_base is None:
-            path_base = self.storage_path
+        path_base = self.storage_path
         self.eval_storage_path = path_base[:-5] + '_eval_problems_' + datetime.now().strftime("%Y-%m-%d-%H:%M:%S") + '.json'
 
         with open(self.eval_storage_path, 'w') as f:
@@ -298,22 +297,25 @@ class RPMDataset:
             self.eval_metadata = json.load(f)
 
 
-def create_default_dataset():
-    dataset = RPMDataset()
+def create_text_rpm_dataset(min_num_rules, max_num_rules, max_num_problems_per_category):
+    dataset = RPMDataset(min_rules=min_num_rules, max_rules=max_num_rules)
     dataset.generate_dataset()
-    dataset.save_dataset('rpm_eval_dataset.json')
 
     new_dataset = RPMDataset()
-    new_dataset.load_dataset('rpm_eval_dataset.json')
+    new_dataset.load_dataset('default_rpm_dataset.json')
     print('Dataset num problems:', dataset.len_dataset)
-    print('Saved properly:', dataset.full_dataset == new_dataset.full_dataset)
+    print('Saved properly:', dataset.full_dataset == new_dataset.full_dataset, dataset.storage_path == new_dataset.storage_path)
+
+    new_dataset.create_eval_problem_set(max_num_problems_per_category=max_num_problems_per_category)    # Also prints metadata
 
 
 def main():
-    dataset = RPMDataset()
-    dataset.generate_dataset()
-    # dataset.load_dataset('default_rpm_dataset.json')
-    dataset.create_eval_problem_set()
+    max_num_problems_per_category = 200
+    min_num_rules = 1
+    max_num_rules = 10
+    create_text_rpm_dataset(min_num_rules=min_num_rules,
+                            max_num_rules=max_num_rules,
+                            max_num_problems_per_category=max_num_problems_per_category)
 
 
 if __name__ == '__main__':

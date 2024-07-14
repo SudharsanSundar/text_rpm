@@ -13,7 +13,7 @@ SUPPORTED_RULES = ['constant', 'progression', 'distribute_3']
 SUPPORTED_NUM_UNIQUE_VALUES = 3
 
 
-# TODO: Tuples might be making things too easy. A more realistic test might be to *concatenate* everything, so you see "ABC" rather than "(A, B, C)". Then, you have to tease it apart, rather than being handed the "parsed" tuple.
+# TODO: Tuples might be making things too easy. A more realistic test might be to *concatenate* everything, so you see "ABC" rather than "(A, B, C)". Then, you have to tease it apart, rather than being handed the "parsed" tuple. BUT, this might break tokenization.
 class RPMMaker:
     def __init__(self):
         pass

@@ -6,6 +6,7 @@ import json
 import re
 import tiktoken
 import time
+import argparse
 
 gpt4_tokenzier = tiktoken.encoding_for_model('gpt-4')
 random.seed(42)
@@ -91,7 +92,7 @@ def eval_model_on_rpm(model_name, model_org, eval_dataset_path, results_save_fol
     print(f'TOTAL TIME TAKEN FOR EVAL: {(time.time() - start_time) / 60} min ({(time.time() - start_time) / (60 * len(eval_problems))} min on avg per problem)')
 
 
-def eval_model_on_rpm_batched(model_name, 
+def eval_model_on_rpm_batched(model_name_or_path, 
                               eval_dataset_path, 
                               results_save_folder, 
                               limit_num_problems=None, 
@@ -99,11 +100,12 @@ def eval_model_on_rpm_batched(model_name,
                               stop_seqs=None, 
                               batch_size=2, 
                               model_org=None,
-                              use_pipeline=False):
+                              use_hf_pipeline=False):
     if api:
-        model = APIModel(model_name=model_name, org=model_org)
+        raise NotImplementedError('Haven\'t gotten batched eval set up for API models yet.')
+        assert not(api and use_hf_pipeline), 'Use of API (hosted model) is mututally exclusive with use of HF pipeline (local model).'
     else:
-        model = ClusterModel(model_name_or_path=model_name, batch_size=batch_size)
+        model = ClusterModel(model_name_or_path=model_name_or_path, batch_size=batch_size)
 
     with open(eval_dataset_path, 'r') as f:
         eval_problems = []
@@ -120,55 +122,115 @@ def eval_model_on_rpm_batched(model_name,
     results = []
     total_score = 0
     start_time = time.time()
-    if use_pipeline:
+    if use_hf_pipeline:
         model_answers = model.get_answer_text_batched(eval_problems)
+
+        for problem, model_answer in zip(eval_problems, model_answers):
+            prompt = problem['problem_prompt']
+            correct_answer = problem['problem_answer']
+            extracted_answer = extract_answer(model_answer)
+
+            result = {
+                'problem_prompt': prompt,
+                'correct_answer': correct_answer,
+                'model_answer': model_answer,
+                'extracted_answer': extracted_answer,
+                'score': int(extracted_answer == correct_answer),
+                'problem_characteristics': problem['characteristics']
+            }
+
+            results.append(result)
+            total_score += result['score']
+
+            print('PROMPT')
+            print(prompt)
+            print('MODEL ANSWER')
+            print(model_answer)
+            print('EXTRACTED ANSWER | CORRECT ANSWER')
+            print(extracted_answer, '|', result['correct_answer'])
+            print('SCORE | TOTAL SCORE')
+            print(result['score'], '|', total_score, '/', len(results))
+            print('-'*100)
     else:
         model_answers = []
         for i in range(0, len(eval_problems), batch_size):
-            model_answers += model.get_answer_text_batched_alt(eval_problems[i:i + batch_size])
+            new_eval_problems = eval_problems[i:min(i + batch_size, len(eval_problems))]
+            new_model_answers = model.get_answer_text_batched_alt(new_eval_problems)
+            model_answers += new_model_answers
 
-    for problem, model_answer in zip(eval_problems, model_answers):
-        prompt = problem['problem_prompt']
-        correct_answer = problem['problem_answer']
-        extracted_answer = extract_answer(model_answer)
+            for problem, model_answer in zip(new_eval_problems, new_model_answers):
+                prompt = problem['problem_prompt']
+                correct_answer = problem['problem_answer']
+                extracted_answer = extract_answer(model_answer)
 
-        result = {
-            'problem_prompt': prompt,
-            'correct_answer': correct_answer,
-            'model_answer': model_answer,
-            'extracted_answer': extracted_answer,
-            'score': int(extracted_answer == correct_answer),
-            'problem_characteristics': problem['characteristics']
-        }
+                result = {
+                    'problem_prompt': prompt,
+                    'correct_answer': correct_answer,
+                    'model_answer': model_answer,
+                    'extracted_answer': extracted_answer,
+                    'score': int(extracted_answer == correct_answer),
+                    'problem_characteristics': problem['characteristics']
+                }
 
-        results.append(result)
-        total_score += result['score']
+                results.append(result)
+                total_score += result['score']
 
-        print('PROMPT')
-        print(prompt)
-        print('MODEL ANSWER')
-        print(model_answer)
-        print('EXTRACTED ANSWER')
-        print(extracted_answer)
-        print('CORRECT ANSWER')
-        print(result['correct_answer'])
-        print('SCORE')
-        print(result['score'])
-        print('-'*100)
+                print('PROMPT')
+                print(prompt)
+                print('MODEL ANSWER')
+                print(model_answer)
+                print('EXTRACTED ANSWER | CORRECT ANSWER')
+                print(extracted_answer, '|', result['correct_answer'])
+                print('SCORE | TOTAL SCORE')
+                print(result['score'], '|', total_score, '/', len(results))
+                print('-'*100)
 
-    save_path = 'rpm_eval_results_' + model_name.replace('/', '-') + '.json'
+    save_path = 'rpm_eval_results_' + model.model_name.replace('/', '-') + '.json'
     if results_save_folder is not None:
         save_path = results_save_folder + save_path
-
     with open(save_path, 'w') as f:
         for result in results:
             f.write(json.dumps(result) + '\n')
+
+    totals = {'total_score': total_score, 'fraction_correct': total_score / len(results), 'total_time_mins': (time.time() - start_time) / 60}
+    save_path = 'rpm_eval_totals_' + model.model_name.replace('/', '-') + '.json'
+    if results_save_folder is not None:
+        save_path = results_save_folder + save_path
+    with open(save_path, 'w') as f:
+        json.dump(totals)
 
     print(f'TOTAL SCORE: {total_score} / {len(eval_problems)} problems correct ({total_score / len(eval_problems)})')
     print(f'TOTAL TIME TAKEN FOR EVAL: {(time.time() - start_time) / 60} min ({(time.time() - start_time) / (60 * len(eval_problems))} min on avg per problem)')
 
 
-def main():
+def main(model_name, use_api, eval_dataset_path, results_save_folder, limit_num_problems, batch_size, use_hf_pipeline):
+    parser = argparse.ArgumentParser(description='Evaluate models on text RPM problems using batched inputs.')
+    parser.add_argument('model_name_or_path', type=str, help='Name of model or path to model to evaluate.')
+    parser.add_argument('eval_dataset_path', type=str, help='Path to eval problems from text rpm dataset.')
+    parser.add_argument('results_save_folder', type=str, help='Path to folder to save results in.')
+    parser.add_argument('batch_size', type=int, help='Batch size to use when doing model inference.')
+    parser.add_argument('--limit_num_problems', type=str, default=None, help='Whether to use a subset of problems for testing. Format as \'method,num_problems\', such as \'first_x,100\'.')
+    parser.add_argument('--use_hf_pipeline', type=bool, default=False, help='Whether to use the HF pipeline class to conduct inference, or use a custom implementation.')
+    parser.add_argument('--use_api', type=bool, default=False, help='Whether to use a model API. Not yet implemented.')
+    args = parser.parse_args()
+
+    eval_model_on_rpm_batched(model_name_or_path=args.model_name_or_path,
+                              eval_dataset_path=args.eval_dataset_path,
+                              results_save_folder=args.results_save_folder,
+                              batch_size=args.batch_size,
+                              limit_num_problems=args.limit_num_problems,
+                              use_hf_pipeline=args.use_hf_pipeline,
+                              api=args.use_api,)
+    
+    # CLUSTER TESTING
+    # eval_model_on_rpm_batched(model_name='Meta-Llama-3-8B-Instruct',
+    #                           api=False,
+    #                           eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
+    #                           results_save_folder='results/',
+    #                           limit_num_problems={'method': 'sample', 'num_problems': 20},
+    #                           batch_size=10,
+    #                           use_hf_pipeline=False)
+
     # Size ~1.5B
     # # Raw | ~30? / 1000 (easy) problems (~0.03 min per problem); 38 / 1000 = 3.8% correct
     # eval_model_on_rpm(model_name='Qwen/Qwen1.5-1.8B',
@@ -237,16 +299,6 @@ def main():
     #                   results_save_folder='results/',
     #                   limit_num_problems=None)
     
-    # CLUSTER TESTING
-    eval_model_on_rpm_batched(model_name='Meta-Llama-3-8B-Instruct',
-                              api=False,
-                              eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-                              results_save_folder='results/',
-                              limit_num_problems={'method': 'sample', 'num_problems': 20},
-                              batch_size=10,
-                              use_pipeline=False)
-
 
 if __name__ == '__main__':
     main()
-    # TODO: get it to run with passed in args
