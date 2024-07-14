@@ -242,8 +242,9 @@ def main():
                               api=False,
                               eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
                               results_save_folder='results/',
-                              limit_num_problems={'method': 'sample', 'num_problems': 1000},
-                              batch_size=100)
+                              limit_num_problems={'method': 'sample', 'num_problems': 20},
+                              batch_size=10,
+                              use_pipeline=False)
 
 
 if __name__ == '__main__':

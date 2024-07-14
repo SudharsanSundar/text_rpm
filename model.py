@@ -59,10 +59,10 @@ base_model_directories = [
 chat_model_directories = [
     # "/data/public_models/huggingface/meta-llama/Meta-Llama-3-70B-Instruct",  # Meta llama models, gen 3, 2
     "/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct",
-    "/data/public_models/huggingface/meta-llama/Llama-2-13b-chat-hf",
+    # "/data/public_models/huggingface/meta-llama/Llama-2-13b-chat-hf",
     # "/data/public_models/huggingface/meta-llama/Llama-2-70b-chat-hf",
-    "/data/public_models/huggingface/meta-llama/Llama-2-7b-chat-hf",
-    "/data/public_models/huggingface/mistralai/Mistral-7B-Instruct-v0.3",  # Mistral models, gen latest
+    # "/data/public_models/huggingface/meta-llama/Llama-2-7b-chat-hf",
+    # "/data/public_models/huggingface/mistralai/Mistral-7B-Instruct-v0.3",  # Mistral models, gen latest
     # "/data/public_models/huggingface/mistralai/Mixtral-8x7B-Instruct-v0.1",
     # "/data/public_models/huggingface/mistralai/Mixtral-8x22B-Instruct-v0.1",        # Skipping for now, tokenizer failing to load
     "/data/public_models/huggingface/Qwen/Qwen1.5-0.5B-Chat",  # Qwen models, gen 2, a few from 1.5
@@ -193,6 +193,11 @@ class ClusterModel:
         if self.model_name in ['falcon-7b-instruct', 'falcon-40b-instruct']:
             self.tokenizer.chat_template = default_falcon_instruct_chat_template
         
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+        self.tokenizer.add_special_tokens({'pad_token': self.tokenizer.pad_token})
+        
         self.model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path=self.model_path,
                                                           device_map="auto",
                                                           torch_dtype="auto",
@@ -237,13 +242,11 @@ class ClusterModel:
         
         self.inference_pipeline.tokenizer.pad_token_id = old_pad_token_id
 
-        print(generations)
-
         return [generation[0]['generated_text'] for generation in generations]
     
     def get_answer_text_batched_alt(self, prompts, system_prompt=None, max_new_tokens=None):
-        old_pad_token = self.tokenizer.pad_token
-        self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+        # old_pad_token = self.tokenizer.pad_token
+        # self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
         formatted_prompts = prompts
         if self.chat_model:
@@ -258,8 +261,6 @@ class ClusterModel:
                                             top_k=None if not self.do_sample else self.top_k,
                                             output_scores=self.output_scores)       # Can also output logits
         model_outputs = self.tokenizer.batch_decode(generated_ids[:, model_inputs.input_ids.shape[1]:], skip_special_tokens=True)
-
-        self.tokenizer.pad_token = old_pad_token
 
         return model_outputs
 
@@ -276,7 +277,6 @@ def main():
             print(answer)
             print('/ / / / /')
         print('-' * 100)
-        break
 
 
 if __name__ == '__main__':
