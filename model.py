@@ -108,33 +108,6 @@ default_falcon_instruct_chat_template = '''{% if messages[0]['role'] == 'system'
     {{ '\n\nAssistant:' }}
 {% endif %}'''
 
-# leftovers = {
-#     'Meta-Llama-3-70B-Instruct': '<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{user_prompt}<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>',
-#     'Meta-Llama-3-8B-Instruct': '<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{user_prompt}<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>',
-#     'Llama-2-13b-chat-hf': '<s>[INST]\n\n{user_prompt} [/INST]',
-#     'Llama-2-70b-chat-hf': '<s>[INST]\n\n{user_prompt} [/INST]',
-#     'Llama-2-7b-chat-hf': LlamaConfig,
-#     'Mistral-7B-Instruct-v0.3': MistralConfig,
-#     'Mixtral-8x7B-Instruct-v0.1': MixtralConfig,
-#     'Mixtral-8x22B-Instruct-v0.1': MixtralConfig,
-#     'Qwen1.5-0.5B-Chat': Qwen2Config,   # ?
-#     'Qwen1.5-1.8B-Chat': Qwen2Config,   # ?
-#     'Qwen1.5-4B-Chat': Qwen2Config,     # ?
-#     'Qwen2-0.5B-Instruct': Qwen2Config,
-#     'Qwen2-1.5B-Instruct': Qwen2Config,
-#     'Qwen2-7B-Instruct': Qwen2Config,
-#     'Qwen2-72B-Instruct': Qwen2Config,
-#     'falcon-7b-instruct': FalconConfig,
-#     'falcon-40b-instruct': FalconConfig,
-#     'falcon-180B-chat': FalconConfig,
-#     'deepseek-llm-7b-chat': None,   # ?
-#     'deepseek-llm-67b-chat': None,  # ?
-#     'gemma-1.1-2b-it': GemmaConfig,
-#     'gemma-1.1-7b-it': GemmaConfig,
-#     'Yi-6B-Chat': LlamaConfig,      # ?
-#     'Yi-34B-Chat': LlamaConfig      # ?
-# }
-
 
 class APIModel:
     def __init__(self, model_name, org='together'):

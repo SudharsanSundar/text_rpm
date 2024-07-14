@@ -238,7 +238,9 @@ def main():     # scancel ss__text-rpm_eval
                               batch_size=args.batch_size,
                               limit_num_problems={'method': args.limit_num_problems.split(',')[0], 'num_problems': int(args.limit_num_problems.split(',')[1])},
                               use_hf_pipeline=args.use_hf_pipeline,
-                              api=args.use_api,)
+                              api=args.use_api)
+    
+    # TODO: 
     
     # CLUSTER TESTING
     # eval_model_on_rpm_batched(model_name='Meta-Llama-3-8B-Instruct',

@@ -5,7 +5,12 @@ import json
 import tiktoken
 from datetime import datetime
 
-DEFAULT_ALPHABET = tuple([[chr(65 + i + 3 * j) for i in range(3)] for j in range(8)])
+# TODO: How should I expand the vocabulary? need 6*3 = 18 more symbols. lower case letters are natural, but have resemblance to upper case that might be confusing. numbers are also natural, but have numerical meaning which can be confusing.
+# NOTE: This might make the task easier or harder: each attribute has its own vocabulary/alphabet.
+DEFAULT_ALPHABET = tuple([[chr(65 + i + 3 * j) for i in range(3)] for j in range(8)] + 
+                         [[chr(97 + i + 3 * j) for i in range(3)] for j in range(8)])   # lowercase letters augmented
+# DEFAULT_ALPHABET = tuple([[chr(65 + i + 3 * j) for i in range(3)] for j in range(8)] + 
+#                          [[i + 3 * j for i in range(1, 4, 1)] for j in range(6)])   # numbers augmented
 DEFAULT_ATTRIBUTES = ('shape_type',
                       'inner_shape_type',
                       'shape_color',
@@ -19,7 +24,7 @@ DEFAULT_ATTRIBUTES = ('shape_type',
                       'inner_shape_orientation',
                       'inner_shape_texture',
                       'inner_shape_position',
-                      'inner_shape_count')
+                      'inner_shape_count')      # at 14 rn
 SUPPORTED_RULES = ('constant', 'progression', 'distribute_3')
 DEFAULT_SAMPLING = {'base_num_exs': 10000,
                     '0_num_noncons_rules_prob': 0.1,
@@ -295,6 +300,10 @@ class RPMDataset:
 
         with open(metadata_path, 'r') as f:
             self.eval_metadata = json.load(f)
+    
+    # TODO: Implement base model data generation/adaptation
+    def convert_chat_eval_dataset_to_base_eval_dataset():
+        pass
 
 
 def create_text_rpm_dataset(min_num_rules, max_num_rules, max_num_problems_per_category):
