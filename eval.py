@@ -131,8 +131,20 @@ def eval_model_on_rpm_batched(model_name_or_path,
     if results_save_folder is not None:
         save_path = results_save_folder + save_path
     save_path = base_path + save_path
+
+    # Determine whether to skip any already evaled problems
+    problems_already_done = None
+    try:
+        with open(save_path, 'r') as f:
+            f_len = sum(1 for line in f)
+            print(f'Found existing results. Skipping already evaled problems ({f_len})...')
+            problems_already_done = f_len
+    except Exception as e:
+        print('Starting eval from scratch...')
+        problems_already_done = 0
     
     if use_hf_pipeline:
+        raise NotImplementedError('Check this code before using it! I think I\'ve made changes to other parts of the pipeline that could break this')
         model_answers = model.get_answer_text_batched(eval_problems)
 
         for problem, model_answer in zip(eval_problems, model_answers):
@@ -163,6 +175,10 @@ def eval_model_on_rpm_batched(model_name_or_path,
             print('-'*100)
     else:
         for i in range(0, len(eval_problems), batch_size):
+            if i < problems_already_done:   # skip already evaled problems
+                print(f'Skipping problems {i} to {i + batch_size - 1}...')
+                continue
+            
             new_eval_problems = eval_problems[i:min(i + batch_size, len(eval_problems))]
             new_model_answers = model.get_answer_text_batched_alt([new_eval_problem['problem_prompt'] for new_eval_problem in new_eval_problems])
             new_results = []
@@ -199,19 +215,22 @@ def eval_model_on_rpm_batched(model_name_or_path,
                 for result in new_results:
                     f.write(json.dumps(result) + '\n')
 
-    with open(save_path, 'w') as f:
-        for result in results:
-            f.write(json.dumps(result) + '\n')
-
-    totals = {'total_score': total_score, 'fraction_correct': total_score / len(results), 'total_time_mins': (time.time() - start_time) / 60}
-    save_path = 'rpm_eval_totals_' + model.model_name.replace('/', '-') + '.json'
+    final_results = []
+    with open(save_path, 'r') as f:
+        for line in f:
+            final_results.append(json.loads(line))
+    
+    total_score = sum(result['score'] for result in final_results)
+    totals = {'total_score': total_score, 'fraction_correct': total_score / len(final_results), 'total_time_mins': (time.time() - start_time) / 60, 'num_evaled_this_run': len(results)}
+    
+    totals_save_path = 'rpm_eval_totals_' + model.model_name.replace('/', '-') + '.json'
     if results_save_folder is not None:
-        save_path = results_save_folder + save_path
-    with open(save_path, 'w') as f:
+        totals_save_path = results_save_folder + totals_save_path
+    with open(totals_save_path, 'w') as f:
         json.dump(totals, f, indent=4)
 
-    print(f'TOTAL SCORE: {total_score} / {len(eval_problems)} problems correct ({total_score / len(eval_problems)})')
-    print(f'TOTAL TIME TAKEN FOR EVAL: {(time.time() - start_time) / 60} min ({(time.time() - start_time) / (60 * len(eval_problems))} min on avg per problem)')
+    print(f'TOTAL SCORE: {total_score} / {len(final_results)} problems correct ({total_score / len(final_results)})')
+    print(f'TOTAL TIME TAKEN FOR EVAL: {(time.time() - start_time) / 60} min ({(time.time() - start_time) / (60 * len(results))} min on avg per problem)')
 
 
 def main():
@@ -233,15 +252,44 @@ def main():
                               use_hf_pipeline=args.use_hf_pipeline,
                               api=args.use_api)
 
+    """
+    TODO:
+    1. Correctly parse answers from models. Use error analysis to figure out how to do this.
+    2. Run evals for larger models. Potentially include better parsing so I don't have to perform the upkeep step
+    
+    X > Start evals for larger models
+    > Do error analysis for unparsable answers
+    > Do error analysis for refusal answers
+    """
+
+
     '''
     Notes from v2 eval run:
-    - Need to redo answers for
-    - - Deepseek 7b chat. Keeps answering with [], which messes up answer extraction
-    - Move to bigs
+    - Done (all chat/instruct/etc.)
+    - - deepseek 7b
+    - - falcon 7b
+    - - llama 2 7b
+    - - qwen 1.5 .5b
+    - - qwen 1.4 1.8b
+    - - qwen 1.5 4b
+    - - qwen 2 .5b
+    - - qwen 2 1.5b
+    - - qwen 2 7b
+    - - yi 6b
+    - - yi 34b
+    - Need to redo answers for pretty much all of the above. Lots of problems with extraction, particularly []
+        - **It'll be really important to run error analysis on extracted answers and deal with them appropriately**
+
+    
+    - Out of memory error
     - - falcon 40b
-    - Crashed, need to redo. check to see why this is the case
+    - - llama 13B chat
+    - Crashed, need to redo. Check to see why this is the case (unspecified launch failure)
     - - gemma 1.1 2b it
     - - gemma 1.1 7b it
+    - - Meta Llama 8B instruct
+    - - Mistral 7B instruct
+    -------> Relaunched all of these with 64 batch size, continuing from save, hoping it takes care of the issue. think batch size is what makes the difference
     '''
 
     # TODO: Create base model pipeline
@@ -252,14 +300,6 @@ def main():
     # 3. Create proper evaluation pipeline for it, particularly for parsing responses, giving it enough response tokens, using the right stop sequence, etc.
     # 4. Run small scale test of evaluation pipeline with base models
     # 5. Prepare scripts to run and run them
-    
-    # TODO: Run chat model evals
-    # 1. Generate canonical dataset (dataset.py). 1 to 14 rules, 200 problems per category
-    #   -> Make sure to rename them to v1
-    # 2. Udpate script to match.
-    # 3. Run script for small models first.
-    # 4. Then run script for larger models.
-
 
     # CLUSTER TESTING
     # eval_model_on_rpm_batched(model_name='Meta-Llama-3-8B-Instruct',

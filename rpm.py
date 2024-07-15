@@ -21,7 +21,7 @@ class RPMMaker:
     @staticmethod
     def make_prompt(attributes, problem_abstraction, prompt_template=prompt_template1):
         # Prepare the empty tuple text
-        possible_empty_characters = ['*', '_']
+        possible_empty_characters = ['_']
         assert len(set(possible_empty_characters) - set(str(problem_abstraction))) > 0
         chosen_empty_character = list(set(possible_empty_characters) - set(str(problem_abstraction)))[0]
         empty_form_values = [chosen_empty_character] * len(attributes)

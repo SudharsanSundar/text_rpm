@@ -4,9 +4,11 @@ from matplotlib import pyplot as plt
 import numpy as np
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr, spearmanr
+import glob
+import os
 
 
-def score_breakdown(eval_results_fp, model_name, save_folder=None):
+def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False):
     with open(eval_results_fp, 'r') as f:
         results = []
         for item in f:
@@ -19,7 +21,7 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None):
             'num_unique_rules': {},
             'num_unparsable_answers': 0,
             'num_parsed_but_incorrectly_formatted_answers': 0,
-            'num_formatted_but_incorrect_shape_answer': 0,
+            'num_formatted_but_improper_answer': 0,
             'overall_accuracy': 0,
         }
         total_in_category = {
@@ -54,7 +56,7 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None):
             score_breakdown_results['num_nonconstant_rules'][num_nonconstant_rules] = score_breakdown_results[
                                                                                           'num_nonconstant_rules'].get(
                 num_nonconstant_rules, 0) + result['score']
-            score_breakdown_results['num_distribute_3_rules'][num_nonconstant_rules] = score_breakdown_results[
+            score_breakdown_results['num_distribute_3_rules'][num_nonconstant_rules] = score_breakdown_results[     # TODO: something is wrong here. everything is num noncons 0
                                                                                            'num_distribute_3_rules'].get(
                 num_distribute_3_rules, 0) + result['score']
             score_breakdown_results['num_unique_rules'][num_unique_rules] = score_breakdown_results[
@@ -66,23 +68,26 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None):
                 score_breakdown_results['num_unparsable_answers'] += 1
             elif not (extracted_answer[0] == '('
                       and extracted_answer[-1] == ')'
-                      and all(65 <= ord(extracted_answer[i]) <= 65 + 26 for i in
-                              range(1, len(extracted_answer), 3))  # Assumes alphabet is capital English letters
+                      and all((65 <= ord(extracted_answer[i]) <= 97 + 26 or 65 <= ord(extracted_answer[i]) <= 97 + 26 or extracted_answer[i] == '?' or extracted_answer[i] in [i for i in range(10)]) for i in range(1, len(extracted_answer), 3))
                       and all(extracted_answer[i:i + 2] == ', ' for i in range(2, len(extracted_answer) - 1, 3))):
-                print('DUD answer:', extracted_answer)
-                print('Correct answer:', result['correct_answer'])
-                print('PROMPT')
-                print(result['problem_prompt'])
-                print('FULL model answer:')
-                print(result['model_answer'])
-                print('-' * 100)
+                # print('DUD answer:', extracted_answer)
+                # print('Correct answer:', result['correct_answer'])
+                # print('PROMPT')
+                # print(result['problem_prompt'])
+                # print('FULL model answer:')
+                # print(result['model_answer'])
+                # print('-' * 100)
+
                 score_breakdown_results['num_parsed_but_incorrectly_formatted_answers'] += 1
-            elif len(extracted_answer.split(',')) != len(result['correct_answer'].split(',')):
-                score_breakdown_results['num_formatted_but_incorrect_shape_answer'] += 1
+            elif len(extracted_answer.split(',')) != len(result['correct_answer'].split(',')) or not (all((65 <= ord(extracted_answer[i]) <= 97 + 26 or 65 <= ord(extracted_answer[i]) <= 97 + 26) for i in range(1, len(extracted_answer), 3))):
+                score_breakdown_results['num_formatted_but_improper_answer'] += 1
 
     score_breakdown_results['overall_accuracy'] = sum(
         score_breakdown_results['total_num_rules'][num_rules] for num_rules in
         score_breakdown_results['total_num_rules']) / len(results)
+    fraction_correct = {
+        category: {num: score_breakdown_results[category][num] / total_in_category[category][num] for num in
+                   total_in_category[category]} for category in total_in_category}
 
     print('SCORE BREAKDOWN')
     print('Total answers:', len(results))
@@ -90,15 +95,12 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None):
     print('Total num unparsable answers:', score_breakdown_results['num_unparsable_answers'])
     print('Total num incorrectly formatted answers:',
           score_breakdown_results['num_parsed_but_incorrectly_formatted_answers'])
-    print('Total num incorrectly shaped answers:', score_breakdown_results['num_formatted_but_incorrect_shape_answer'])
+    print('Total num incorrectly shaped answers:', score_breakdown_results['num_formatted_but_improper_answer'])
     print('- - - Absolute total num problems:')
     ppr.pprint(total_in_category)
     print('- - - Absolute correct:')
     ppr.pprint(score_breakdown_results)
     print('- - - Fraction correct:')
-    fraction_correct = {
-        category: {num: score_breakdown_results[category][num] / total_in_category[category][num] for num in
-                   total_in_category[category]} for category in total_in_category}
     ppr.pprint(fraction_correct)
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 5))
@@ -125,13 +127,177 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None):
     save_fp = '_'.join(title.replace('/', '-').split(' '))
     if save_folder is not None:
         save_fp = save_folder + save_fp
-    plt.savefig(save_fp + '.png', dpi=300)
+    if save_figure:
+        plt.savefig(save_fp + '.png', dpi=300)
     plt.show()
 
     score_breakdown_results['fraction_correct'] = fraction_correct
     score_breakdown_results['problem_meta_data'] = total_in_category
     with open(save_fp + '.json', 'w') as f:
-        json.dump(score_breakdown_results, f)
+        json.dump(score_breakdown_results, f, indent=4)
+
+
+def clean_response(raw_txt):
+    new_txt = '('
+    valid_chars = [chr(65 + i) for i in range(26)] + [chr(97 + i) for i in range(26)] + ['?'] + [str(i) for i in range(10)]
+    good_chars = []
+    for sub_char in raw_txt:
+        if sub_char in valid_chars:
+            good_chars.append(sub_char)
+    new_txt += ', '.join(good_chars) + ')'
+    return new_txt
+
+
+def reparse_answers(eval_results_fp, model_name, overwrite=False, save_path=None):
+    results = []
+    with open(eval_results_fp, 'r') as f:
+        for item in f:
+            results.append(json.loads(item))
+        
+    print('Doing:', model_name)
+    invalid_response_words = [
+        'missing',
+        'unknown',
+        'unanswered',
+        'lack',
+        'further',
+        'cannot',
+        'more',
+        'none',
+        'valid',
+        'sequence',
+        'pattern',
+        'letters',
+        'additional',
+        'placeholder',
+        'shape',
+        'correct',
+        'blank',
+        'true',
+        'information',
+        'specific',
+        'determine',
+        'your final answer',
+        'relationship',
+        'context',
+        'the final tuple of row 3',
+        'no final answer',
+        'the number of',
+        'no value provided',
+        'triangle',
+        'star',
+        'circle',
+        'diamond',
+        'square',
+        'blue',
+        'green'
+    ]
+
+    counts = [0, 0, 0, 0, 0, 0, 0]
+    total_change = 0
+    idxs = []
+    i = 0
+
+    new_results = []
+    for old_result in results:
+        result = old_result.copy()
+        extracted_answer = result['extracted_answer']
+        bracket_extract = '' if extracted_answer.find('[') == -1 or extracted_answer.find(']') == -1 else extracted_answer[extracted_answer.find('['):extracted_answer.find(']') + 1]
+
+        # Skip parse errors
+        if extracted_answer == 'Could not parse answer.':
+            counts[1] += 1
+            # TODO: analyze these !!!!!
+
+        # Skip refusal answers
+        elif any(word in extracted_answer.lower() for word in invalid_response_words) and (len(bracket_extract) > 0 and any(word in bracket_extract.lower() for word in invalid_response_words) or len(bracket_extract) == 0):
+            counts[0] += 1
+            # TODO: analyze these !!!!!
+
+        # Catch answers that aren't in proper [ABCabc?] tuple format
+        elif not (extracted_answer[0] == '('
+                  and extracted_answer[-1] == ')'
+                  and all((65 <= ord(extracted_answer[i]) <= 97 + 26 or 65 <= ord(extracted_answer[i]) <= 97 + 26 or extracted_answer[i] == '?' or extracted_answer[i] in [i for i in range(10)]) for i in range(1, len(extracted_answer), 3))  # Assumes alphabet is capital and lowercase English letters and single digits
+                  and all(extracted_answer[i:i + 2] == ', ' for i in range(2, len(extracted_answer) - 1, 3))):
+            counts[2] += 1
+            cleaned_answer = None
+
+            # If answer is bracketed, clean bracketed portion
+            if len(bracket_extract) > 0:
+                counts[3] += 1
+                cleaned_answer = clean_response(bracket_extract)
+            # If answer is not bracketed (often parens), clean whole answer
+            else:
+                counts[4] += 1
+                cleaned_answer = clean_response(extracted_answer)
+            
+            result['score'] = int(cleaned_answer == result['correct_answer'])
+            result['extracted_answer'] = cleaned_answer
+            result['old_extract'] = extracted_answer
+            # if len(idxs) == 0:
+            #     print(f'OLD {extracted_answer} | NEW {cleaned_answer} | SCORE CHANGE {abs(int(cleaned_answer == result["correct_answer"]) - int(extracted_answer == result["correct_answer"]))}')
+
+            total_change += abs(int(cleaned_answer == result["correct_answer"]) - int(extracted_answer == result["correct_answer"]))
+            idxs.append(i)
+        
+        new_results.append(result)
+        i += 1
+
+        '''
+        common patterns:
+        The final tuple of Row 3 is (...).
+        // sometimes there's the above AND an actual answer. So should first try "final answer is: (...)", then fall back to above, then fall back to final tuple, etc.
+        X [...].)
+        X [...].")
+        X [...])
+        X [...]")
+        X [A-B-c-...].)
+        X [your final answer].)
+        X [your final answer].")
+        X (?,?,...)
+        X (?, ?, ?, ...)
+        X (A, B,C,D) // etc.
+        (Shape A, Shape B, ...)
+        (triangle, star, circle with diagonal line, ...)
+        X ("A", "B", "C", ...)
+        X A.) // etc.
+        X A) // etc.
+        '''
+    
+    # Check amount of changes and catches
+    print(counts)
+    print(total_change)
+
+    # for idx in idxs:
+    #     print(new_results[idx])
+    #     break
+
+    # Save if desired
+    if overwrite:
+        assert save_path is not None
+        with open(save_path, 'w') as f:
+            for result in new_results:
+                f.write(json.dumps(result) + '\n')
+
+
+def v2_eval_runs_corrections(results_folder='./v2_results/', save_folder='./v2_results_cleaned/', results_file_prefix='rpm_eval_results_'):
+    all_results_files = glob.glob(results_folder + results_file_prefix + '*.json')
+    print(len(all_results_files), all_results_files)
+    for fp in all_results_files:
+        model_name = fp[len(results_folder + results_file_prefix):-len('.json')]
+        reparse_answers(eval_results_fp=fp, 
+                        model_name=model_name, 
+                        # overwrite=True, 
+                        # save_path=save_folder + results_file_prefix[:-1] + '2_' + fp[len(results_folder + results_file_prefix):]
+        )
+
+
+def v2_eval_runs_analysis(results_folder='./v2_results_cleaned/', save_folder='./v2_results_analysis/', results_file_prefix='rpm_eval_results2_'):
+    all_results_files = glob.glob(results_folder + results_file_prefix + '*.json')
+    print(len(all_results_files), all_results_files)
+    for fp in all_results_files:
+        model_name = fp[len(results_folder + results_file_prefix):-len('.json')]
+        score_breakdown(eval_results_fp=fp, model_name=model_name, save_folder=save_folder)
 
 
 def correlation_calculator():
@@ -210,7 +376,8 @@ def main():
     # score_breakdown('results/rpm_eval_results_Qwen-Qwen1.5-1.8B-Chat.json', 'Qwen/Qwen1.5-1.8B-Chat')
     # score_breakdown('results/rpm_eval_results_meta-llama-Llama-3-70b-chat-hf_old.json',
     #                 'meta-llama-Llama-3-70b-chat-hf', save_folder='analysis/')
-    score_breakdown('results/rpm_eval_results_Qwen2-0.5B-Instruct.json', 'Qwen2-0.5B-Instruct')
+    # score_breakdown('results/rpm_eval_results_Qwen2-0.5B-Instruct.json', 'Qwen2-0.5B-Instruct')
+    v2_eval_runs_analysis()
 
 
 if __name__ == '__main__':
