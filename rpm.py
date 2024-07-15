@@ -125,7 +125,7 @@ class RPMMaker:
     @staticmethod
     def generate_all_unique_problems_from_rules(attribute_to_rule: dict,
                                                 attribute_to_values: dict = None,
-                                                max_num_rule_configs_tried: int = 10000):
+                                                max_num_rule_configs_tried: int = 1000):
         """
         :param attribute_to_rule: dict, what rule to apply to the given attribute
         :param attribute_to_values: optional dict, what values to use for the given attribute
@@ -191,6 +191,7 @@ class RPMMaker:
             else:
                 attribute = attributes[attr_idx]
                 order_permutations = list(itertools.permutations([i for i in range(3)]))
+                random.shuffle(order_permutations)
 
                 if attribute_to_rule[attributes[attr_idx]] != 'distribute_3':
                     for order_permutation in order_permutations:

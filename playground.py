@@ -2,6 +2,7 @@
 from rpm import RPMMaker
 import dataset
 import random
+import json
 
 DEFAULT_ALPHABET = tuple([[chr(65 + i + 3 * j) for i in range(3)] for j in range(8)] + 
                          [[chr(97 + i + 3 * j) for i in range(3)] for j in range(8)])   # lowercase letters augmented
@@ -39,6 +40,16 @@ def create_example_problem(num_rules, num_sampled=3):
         print(prompt)
         print('ANSWER', answer)
         print('-'*100)
+
+
+def check_num_rules_problems(num_rules):
+    with open('datasets/default_rpm_dataset_eval_problems_v1.json', 'r') as f:
+        eval_problems = []
+        for line in f:
+            problem = json.loads(line)
+            if len(problem['attributes']) == 1:
+                eval_problems.append(problem)
+        
 
 
 def main():

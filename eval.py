@@ -106,7 +106,7 @@ def eval_model_on_rpm_batched(model_name_or_path,
         raise NotImplementedError('Haven\'t gotten batched eval set up for API models yet.')
         assert not(api and use_hf_pipeline), 'Use of API (hosted model) is mututally exclusive with use of HF pipeline (local model).'
     else:
-        model = ClusterModel(model_name_or_path=model_name_or_path, batch_size=batch_size)
+        model = ClusterModel(model_name_or_path=model_name_or_path, batch_size=batch_size)      # batch size arg only relevant for hf pipeline actually
 
     with open(eval_dataset_path, 'r') as f:
         eval_problems = []
@@ -131,13 +131,6 @@ def eval_model_on_rpm_batched(model_name_or_path,
     if results_save_folder is not None:
         save_path = results_save_folder + save_path
     save_path = base_path + save_path
-    # try:
-    #     with open(save_path, 'r') as f:
-    #         print('WARNING: Already some file at save location. Overwriting...')
-    #     with open(save_path, 'w') as f:
-    #         print('Overwritten.')
-    # except:
-    #     print('No existing save file detecting. Will save to new file.')
     
     if use_hf_pipeline:
         model_answers = model.get_answer_text_batched(eval_problems)
@@ -221,7 +214,7 @@ def eval_model_on_rpm_batched(model_name_or_path,
     print(f'TOTAL TIME TAKEN FOR EVAL: {(time.time() - start_time) / 60} min ({(time.time() - start_time) / (60 * len(eval_problems))} min on avg per problem)')
 
 
-def main():     # scancel ss__text-rpm_eval
+def main():
     parser = argparse.ArgumentParser(description='Evaluate models on text RPM problems using batched inputs.')
     parser.add_argument('--model_name_or_path', type=str, required=True, help='Name of model or path to model to evaluate.')
     parser.add_argument('--eval_dataset_path', type=str, required=True, help='Path to eval problems from text rpm dataset.')
@@ -240,8 +233,23 @@ def main():     # scancel ss__text-rpm_eval
                               use_hf_pipeline=args.use_hf_pipeline,
                               api=args.use_api)
     
-    # TODO: 
+    # TODO: Create base model pipeline
+    # 1. Make sure inference works correctly in ClusterModel class
+    # 2. Generate proper data for evaluating base models 
+    #   -> create good format -> consider what the stop sequence should be. Probably \n\n.
+    #   -> choose proper examples, and proper num examples
+    # 3. Create proper evaluation pipeline for it, particularly for parsing responses, giving it enough response tokens, using the right stop sequence, etc.
+    # 4. Run small scale test of evaluation pipeline with base models
+    # 5. Prepare scripts to run and run them
     
+    # TODO: Run chat model evals
+    # 1. Generate canonical dataset (dataset.py). 1 to 14 rules, 200 problems per category
+    #   -> Make sure to rename them to v1
+    # 2. Udpate script to match.
+    # 3. Run script for small models first.
+    # 4. Then run script for larger models.
+
+
     # CLUSTER TESTING
     # eval_model_on_rpm_batched(model_name='Meta-Llama-3-8B-Instruct',
     #                           api=False,

@@ -4,6 +4,7 @@ import pprint as ppr
 import json
 import tiktoken
 from datetime import datetime
+import time
 
 # TODO: How should I expand the vocabulary? need 6*3 = 18 more symbols. lower case letters are natural, but have resemblance to upper case that might be confusing. numbers are also natural, but have numerical meaning which can be confusing.
 # NOTE: This might make the task easier or harder: each attribute has its own vocabulary/alphabet.
@@ -134,9 +135,10 @@ class RPMDataset:
         for num_rules in range(self.min_num_rules, self.max_num_rules + 1, 1):
             print(self.alphabet, 'NUM RULES NOW', num_rules)
 
-            # Generate all possible combinations of rules that are a sequence of num_rules long
+            # Generate all possible combinations of rules that are a sequence of num_rules long. Sample down to 
             all_rule_combos = []
             self.generate_rule_combos(num_rules, 0, None, all_rule_combos)
+            all_rule_combos = random.sample(all_rule_combos, k=min(len(all_rule_combos), 2500))
 
             # Loop through each possible rule combination and create problem instantiations based on the given rule combo
             all_iteration_outputs = []
@@ -144,7 +146,7 @@ class RPMDataset:
                 # Generate all info for problem specifications
                 attributes = [self.all_attributes[0]] + random.sample(self.all_attributes, k=num_rules-1)
                 random.shuffle(attributes)
-                random.shuffle(rule_combo)
+                random.shuffle(rule_combo)      # Consider shuffling the alphabet as well
                 if any('inner' in attribute for attribute in attributes) and self.all_attributes[1] not in attributes:
                     inner_attr_idx = random.choice([i for i in range(len(attributes)) if 'inner' in attributes[i]])
                     attributes[inner_attr_idx] = self.all_attributes[1]
@@ -315,13 +317,32 @@ def create_text_rpm_dataset(min_num_rules, max_num_rules, max_num_problems_per_c
     print('Dataset num problems:', dataset.len_dataset)
     print('Saved properly:', dataset.full_dataset == new_dataset.full_dataset, dataset.storage_path == new_dataset.storage_path)
 
-    new_dataset.create_eval_problem_set(max_num_problems_per_category=max_num_problems_per_category)    # Also prints metadata
+    dataset.create_eval_problem_set(max_num_problems_per_category=max_num_problems_per_category)    # Also prints metadata
+
+
+def timing_rule_ordering():
+    dataset = RPMDataset()
+    for i in range(6, 15, 1):
+        start = time.time()
+        all_rule_combos = []
+        dataset.generate_rule_combos(i, 0, None, all_rule_combos)
+        print(f'Total time for {i}:', time.time() - start)
+        print(f'Num orderings: {len(all_rule_combos)}')
+
+
+def test_create_dataset():
+    dataset = RPMDataset(min_rules=1, max_rules=1)
+    dataset.generate_dataset()
+    ppr.pprint(dataset.full_dataset)
+
+    all_problems = [len(problems['problem_abstractions']) for problems in dataset.full_dataset['1_num_rules']]
+    print(sum(all_problems))
 
 
 def main():
-    max_num_problems_per_category = 200
+    max_num_problems_per_category = 250
     min_num_rules = 1
-    max_num_rules = 10
+    max_num_rules = 14
     create_text_rpm_dataset(min_num_rules=min_num_rules,
                             max_num_rules=max_num_rules,
                             max_num_problems_per_category=max_num_problems_per_category)
