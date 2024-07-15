@@ -16,7 +16,7 @@ model_directories=(
     "/data/public_models/huggingface/Qwen/Qwen2-7B-Instruct"
     # "/data/public_models/huggingface/Qwen/Qwen2-72B-Instruct"               #
     "/data/public_models/huggingface/tiiuae/falcon-7b-instruct"
-    "/data/public_models/huggingface/tiiuae/falcon-40b-instruct"
+    # "/data/public_models/huggingface/tiiuae/falcon-40b-instruct"            #
     # "/data/public_models/huggingface/tiiuae/falcon-180B-chat"               #
     "/data/public_models/huggingface/deepseek-ai/deepseek-llm-7b-chat"
     # "/data/public_models/huggingface/deepseek-ai/deepseek-llm-67b-chat"     #
@@ -66,9 +66,9 @@ echo "${batch_size}"
 cd /data/sudharsan_sundar/text_rpm
 python eval.py \
    --model_name_or_path "${model_path}" \
-   --eval_dataset_path "datasets/default_rpm_dataset_eval_problems_v1.json" \
+   --eval_dataset_path "datasets/default_rpm_dataset_eval_problems_v2.json" \
    --batch_size $batch_size \
-   --results_save_folder "v1_results/"
+   --results_save_folder "v2_results/"
 
 EOF
 

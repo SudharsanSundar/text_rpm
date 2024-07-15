@@ -229,10 +229,21 @@ def main():
                               eval_dataset_path=args.eval_dataset_path,
                               results_save_folder=args.results_save_folder,
                               batch_size=args.batch_size,
-                              limit_num_problems={'method': args.limit_num_problems.split(',')[0], 'num_problems': int(args.limit_num_problems.split(',')[1])},
+                              limit_num_problems=args.limit_num_problems if args.limit_num_problems is None else {'method': args.limit_num_problems.split(',')[0], 'num_problems': int(args.limit_num_problems.split(',')[1])},
                               use_hf_pipeline=args.use_hf_pipeline,
                               api=args.use_api)
-    
+
+    '''
+    Notes from v2 eval run:
+    - Need to redo answers for
+    - - Deepseek 7b chat. Keeps answering with [], which messes up answer extraction
+    - Move to bigs
+    - - falcon 40b
+    - Crashed, need to redo. check to see why this is the case
+    - - gemma 1.1 2b it
+    - - gemma 1.1 7b it
+    '''
+
     # TODO: Create base model pipeline
     # 1. Make sure inference works correctly in ClusterModel class
     # 2. Generate proper data for evaluating base models 
