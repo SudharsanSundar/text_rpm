@@ -149,7 +149,7 @@ class ClusterModel:
                  temperature=0, 
                  top_p=0, 
                  top_k=1, 
-                 max_new_tokens=1024,
+                 max_new_tokens=2048,
                  output_scores=False, 
                  batch_size=None):
         if '/' in model_name_or_path:

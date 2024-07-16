@@ -22,7 +22,7 @@ def extract_answer(model_answer):
 
         return extracted_answer
     else:
-        backup_pattern = r'\([A-Z, ]+\)'     # WARNING: assumes values are capital letters A-Z
+        backup_pattern = r'\([A-Za-z, ]+\)'     # WARNING: assumes values are capital or lowercase letters A-Z, a-z
         backup_find = list(re.findall(backup_pattern, model_answer))
         if len(backup_find) > 0:
             return backup_find[-1]
@@ -137,8 +137,9 @@ def eval_model_on_rpm_batched(model_name_or_path,
     try:
         with open(save_path, 'r') as f:
             f_len = sum(1 for line in f)
-            print(f'Found existing results. Skipping already evaled problems ({f_len})...')
             problems_already_done = f_len
+            assert problems_already_done / batch_size == problems_already_done // batch_size
+            print(f'Found existing results. Skipping already evaled problems ({f_len})...')
     except Exception as e:
         print('Starting eval from scratch...')
         problems_already_done = 0
@@ -254,12 +255,16 @@ def main():
 
     """
     TODO:
-    1. Correctly parse answers from models. Use error analysis to figure out how to do this.
-    2. Run evals for larger models. Potentially include better parsing so I don't have to perform the upkeep step
-    
+    X 1. Correctly parse answers from models. Use error analysis to figure out how to do this.
+    X 2. Run evals for larger models. Potentially include better parsing so I don't have to perform the upkeep step
     X > Start evals for larger models
-    > Do error analysis for unparsable answers
-    > Do error analysis for refusal answers
+    X > Do error analysis for unparsable answers
+    X > Do error analysis for refusal answers
+    X 3. Generate cleaned answers
+    > Restart run of deepseek 67B before going to bed
+    4.1. Regenerate cleaned answers and analysis
+    4.2. Generate output charts to show capabilities correlation etc.
+    5. Do the cool stuff again! Like thinking about the nature of intelligence
     """
 
 
