@@ -7,6 +7,336 @@ from scipy.stats import pearsonr, spearmanr
 import glob
 import os
 import re
+import math
+
+evaled_model_fps = [
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-70B-Instruct", ##      # running at 128 -> running again at 128 for speed
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct", ##
+    "/data/public_models/huggingface/meta-llama/Llama-2-13b-chat-hf", ##
+    "/data/public_models/huggingface/meta-llama/Llama-2-70b-chat-hf", ##       # running at 128 -> starting again cuz took over 4 hrs, 128
+    "/data/public_models/huggingface/meta-llama/Llama-2-7b-chat-hf", ##
+    "/data/public_models/huggingface/mistralai/Mistral-7B-Instruct-v0.3", ##
+    "/data/public_models/huggingface/mistralai/Mixtral-8x7B-Instruct-v0.1", ##  #
+    "/data/public_models/huggingface/Qwen/Qwen1.5-0.5B-Chat", ##
+    "/data/public_models/huggingface/Qwen/Qwen1.5-1.8B-Chat", ##
+    "/data/public_models/huggingface/Qwen/Qwen1.5-4B-Chat", ##
+    "/data/public_models/huggingface/Qwen/Qwen2-0.5B-Instruct", ##
+    "/data/public_models/huggingface/Qwen/Qwen2-1.5B-Instruct", ##
+    "/data/public_models/huggingface/Qwen/Qwen2-7B-Instruct", ##
+    "/data/public_models/huggingface/Qwen/Qwen2-72B-Instruct", ##              # ran out 128 -> running at 64
+    "/data/public_models/huggingface/tiiuae/falcon-7b-instruct", ##
+    # "/data/public_models/huggingface/tiiuae/falcon-40b-instruct", #/           # !!! Careful of non-128-divisible batch size !!! running out of memory even with 64 batch size? -> even 32 by a little?? -> still crashing at 24, and it's bad 
+    # "/data/public_models/huggingface/tiiuae/falcon-180B-chat", #/               # has some problem with 'token_type_ids' passed in for generate kwargs
+    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-7b-chat", ##
+    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-67b-chat",     # ran out 128 -> running at 64
+    "/data/public_models/huggingface/google/gemma-1.1-2b-it", ##
+    "/data/public_models/huggingface/google/gemma-1.1-7b-it", ##
+    "/data/public_models/huggingface/01-ai/Yi-6B-Chat", ##
+    "/data/public_models/huggingface/01-ai/Yi-34B-Chat" ##
+]
+
+evaled_models = [fp.split('/')[-1] for fp in evaled_model_fps]
+
+model_to_param_count = {
+  "Meta-Llama-3-70B-Instruct": "70B",
+  "Meta-Llama-3-8B-Instruct": "8B",
+  "Llama-2-13b-chat-hf": "13B",
+  "Llama-2-70b-chat-hf": "70B",
+  "Llama-2-7b-chat-hf": "7B",
+  "Mistral-7B-Instruct-v0.3": "7B",
+  "Mixtral-8x7B-Instruct-v0.1": "8x7B",
+  "Qwen1.5-0.5B-Chat": "0.5B",
+  "Qwen1.5-1.8B-Chat": "1.8B",
+  "Qwen1.5-4B-Chat": "4B",
+  "Qwen2-0.5B-Instruct": "0.5B",
+  "Qwen2-1.5B-Instruct": "1.5B",
+  "Qwen2-7B-Instruct": "7B",
+  "Qwen2-72B-Instruct": "72B",
+  "falcon-7b-instruct": "7B",
+  "falcon-40b-instruct": "40B",
+  "falcon-180B-chat": "180B",
+  "deepseek-llm-7b-chat": "7B",
+  "deepseek-llm-67b-chat": "67B",
+  "gemma-1.1-2b-it": "2B",
+  "gemma-1.1-7b-it": "7B",
+  "Yi-6B-Chat": "6B",
+  "Yi-34B-Chat": "34B"
+}
+model_to_param_count = {key: float(value[:-1]) for key, value in zip(model_to_param_count.keys(), model_to_param_count.values()) if key != 'Mixtral-8x7B-Instruct-v0.1'}
+model_to_param_count['Mixtral-8x7B-Instruct-v0.1'] = 45
+
+model_to_tokens_seen = {
+  "Meta-Llama-3-70B-Instruct": 15_000_000_000_000,
+  "Meta-Llama-3-8B-Instruct": 15_000_000_000_000,
+  "Llama-2-13b-chat-hf": 2_000_000_000_000,
+  "Llama-2-70b-chat-hf": 2_000_000_000_000,
+  "Llama-2-7b-chat-hf": 2_000_000_000_000,
+#   "Mistral-7B-Instruct-v0.3": null,
+#   "Mixtral-8x7B-Instruct-v0.1": null,
+#   "Qwen1.5-0.5B-Chat": null,
+#   "Qwen1.5-1.8B-Chat": null,
+#   "Qwen1.5-4B-Chat": null,
+#   "Qwen2-0.5B-Instruct": null,
+#   "Qwen2-1.5B-Instruct": 7_200_000_000_000,       # "roughly over 7T", https://github.com/QwenLM/Qwen2/issues/515
+#   "Qwen2-7B-Instruct": 7_200_000_000_000,
+#   "Qwen2-72B-Instruct": 7_200_000_000_000,
+  "falcon-7b-instruct": 1_500_000_000_000,
+  "falcon-40b-instruct": 1_000_000_000_000,
+  "falcon-180B-chat": 3_500_000_000_000,
+  "deepseek-llm-7b-chat": 2_000_000_000_000,
+  "deepseek-llm-67b-chat": 2_000_000_000_000,
+  "gemma-1.1-2b-it": 3_000_000_000_000,
+  "gemma-1.1-7b-it": 6_000_000_000_000,
+  "Yi-6B-Chat": 3_100_000_000_000,
+  "Yi-34B-Chat": 3_100_000_000_000
+}
+
+model_to_gscore = {
+    'Qwen1.5-0.5B-Chat': -7.60,
+    'Qwen1.5-1.8B-Chat': -4.54,
+    'gemma-1.1-2b-it': -4.07,
+    'falcon-7b-instruct': -3.68,
+    'Qwen1.5-4B-Chat': -3.44,
+    'Qwen1.5-7B-Chat': -2.34,
+    'Llama-2-7b-chat-hf': -1.85,
+    # 'gemma-1.1-7b-it': -1.12,
+    'Llama-2-13b-chat-hf': -0.76,
+    'Yi-6B-Chat': -0.67,
+    'Qwen1.5-14B-Chat': -0.66,
+    'deepseek-llm-7b-chat': -0.62,
+    'falcon-40b-instruct': 0.56,
+    'Mistral-7B-Instruct-v0.2': 0.73,
+    'Qwen1.5-72B-Chat': 0.74,
+    'Qwen1.5-32B-Chat': 0.94,
+    'Meta-Llama-3-8B-Instruct': 1.13,
+    'Llama-2-70b-chat-hf': 1.21,
+    'Yi-34B-Chat': 1.71,
+    'Qwen1.5-110B-Chat': 2.43,
+    'falcon-180B-chat': 2.58,
+    'deepseek-llm-67b-chat': 2.91,
+    'Mixtral-8x7B-Instruct-v0.1': 3.36,
+    'dbrx-instruct': 3.60,
+    'Meta-Llama-3-70B-Instruct': 4.57,
+    'Mixtral-8x22B-Instruct-v0.1': 4.87
+}
+
+model_to_values = {
+    "Meta-Llama-3-70B-Instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 82,
+        'human_eval': 81.7,
+        'gsm8k': 93,
+        'math': 50.4,
+        'gpqa': 39.5
+    },
+    "Meta-Llama-3-8B-Instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 68.4,
+        'human_eval': 62.2,
+        'gsm8k': 79.6,
+        'math': 30,
+        'gpqa': 34.2
+    },
+    "Llama-2-13b-chat-hf": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 54.8,
+        'gpqa': None,
+        'human_eval': 18.3,
+        'gsm8k': 28.7,
+        'math': None,
+    },
+    "Llama-2-70b-chat-hf": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 68.9,
+        'gpqa': None,
+        'human_eval': 29.9,
+        'gsm8k': 56.8,
+        'math': None,
+    },
+    "Llama-2-7b-chat-hf": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 45.3,
+        'gpqa': None,
+        'human_eval': 12.8,
+        'gsm8k': 14.6,
+        'math': None,
+    },
+    "Mistral-7B-Instruct-v0.3": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "Mixtral-8x7B-Instruct-v0.1": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': None,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "Qwen1.5-0.5B-Chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': None,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "Qwen1.5-1.8B-Chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': None,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "Qwen1.5-4B-Chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': None,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "Qwen2-0.5B-Instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': None,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "Qwen2-1.5B-Instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': None,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "Qwen2-7B-Instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 70.5,
+        'gpqa': None,
+        'human_eval': 79.9,
+        'gsm8k': 82.3,
+        'math': 49.6,
+    },
+    "Qwen2-72B-Instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 82.3,
+        'gpqa': 42.4,
+        'human_eval': 86,
+        'gsm8k': 91.1,
+        'math': 59.7,
+    },
+    "falcon-7b-instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 28,       # Not sure if this is instruct
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "falcon-40b-instruct": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 57,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': None,
+        'math': None,
+    },
+    "falcon-180B-chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 70.6,
+        'gpqa': None,
+        'human_eval': 35.4,
+        'gsm8k': None,
+        'math': None,
+    },
+    "deepseek-llm-7b-chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 49.4,
+        'gpqa': None,
+        'human_eval': 48.2,
+        'gsm8k': 63,
+        'math': 15.8,
+    },
+    "deepseek-llm-67b-chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 71.1,
+        'gpqa': None,
+        'human_eval': 73.8,
+        'gsm8k': 84.1,
+        'math': 32.6,
+    },
+    "gemma-1.1-2b-it": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 42.3,       # Note sure if this is instruct
+        'gpqa': None,
+        'human_eval': 22,
+        'gsm8k': 17.7,
+        'math': 11.8,
+    },
+    "gemma-1.1-7b-it": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 64.3,
+        'gpqa': None,
+        'human_eval': 32.3,
+        'gsm8k': 46.4,
+        'math': 24.3,
+    },
+    "Yi-6B-Chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 60.99,  # taking their 5-shot, since this is common
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': 44.88,     # taking 4-shot, arbitrarily
+        'math': None,
+    },
+    "Yi-34B-Chat": {
+        'num_params': None,
+        'tokens_seen': None,
+        'mmlu': 73.46,
+        'gpqa': None,
+        'human_eval': None,
+        'gsm8k': 75.97,
+        'math': None,
+    },
+}
+print(set(model_to_param_count.keys()) - set(model_to_values.keys()))
+for key in model_to_param_count.keys():
+    model_to_values[key]['num_params'] = model_to_param_count[key]
+    if key in model_to_tokens_seen:
+        model_to_values[key]['tokens_seen'] = model_to_tokens_seen[key]
+    if key in model_to_gscore:
+        model_to_values[key]['gscore'] = model_to_gscore[key]
+    else:
+        model_to_values[key]['gscore'] = None
 
 
 def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False):
@@ -104,11 +434,23 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
         ppr.pprint(score_breakdown_results)
         print('- - - Fraction correct:')
         ppr.pprint(fraction_correct)
+    
+    title = f'rpm eval analysis/{model_name}'
+    save_fp = '_'.join(title.replace('/', '-').split(' '))
+    if save_folder is not None:
+        save_fp = save_folder + save_fp
+    
+    score_breakdown_results['fraction_correct'] = fraction_correct
+    score_breakdown_results['problem_meta_data'] = total_in_category
+    with open(save_fp + '.json', 'w') as f:
+        json.dump(score_breakdown_results, f, indent=4)
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 5))
+    fig, axes = plt.subplots(2, 1, figsize=(12, 5))
+    del fraction_correct['num_nonconstant_rules']
+    del fraction_correct['num_distribute_3_rules']
 
     for i, category in enumerate(fraction_correct):
-        ax = axes[i // 2, i % 2]
+        ax = axes[i] # axes[i // 2, i % 2]
         keys = list(fraction_correct[category].keys())
         values = list(fraction_correct[category].values())
 
@@ -122,21 +464,12 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
             ax.text(bar.get_x() + bar.get_width() / 2, height, f'n={total_in_category[category][key]}', ha='center',
                     va='bottom')
 
-    title = f'rpm eval analysis/{model_name}'
     fig.suptitle(title)
     plt.tight_layout()
 
-    save_fp = '_'.join(title.replace('/', '-').split(' '))
-    if save_folder is not None:
-        save_fp = save_folder + save_fp
     if save_figure:
         plt.savefig(save_fp + '.png', dpi=300)
     plt.show()
-
-    score_breakdown_results['fraction_correct'] = fraction_correct
-    score_breakdown_results['problem_meta_data'] = total_in_category
-    with open(save_fp + '.json', 'w') as f:
-        json.dump(score_breakdown_results, f, indent=4)
     
     plt.close()
 
@@ -318,12 +651,16 @@ def v2_eval_runs_corrections(results_folder='./v2_results/', save_folder='./v2_r
         )
 
 
-def v2_eval_runs_analysis(results_folder='./v2_results_cleaned/', save_folder='./v2_results_analysis/', results_file_prefix='rpm_eval_results2_'):
+def v2_eval_runs_analysis(results_folder='./v2_results_cleaned/', 
+                          save_folder='./v2_results_analysis/', 
+                          results_file_prefix='rpm_eval_results2_', 
+                          save_figure=False):
     all_results_files = glob.glob(results_folder + results_file_prefix + '*.json')
     print(len(all_results_files), all_results_files)
     for fp in all_results_files:
-        model_name = fp[len(results_folder + results_file_prefix):-len('.json')]
-        score_breakdown(eval_results_fp=fp, model_name=model_name, save_folder=save_folder)
+        if True:
+            model_name = fp[len(results_folder + results_file_prefix):-len('.json')]
+            score_breakdown(eval_results_fp=fp, model_name=model_name, save_folder=save_folder, save_figure=save_figure)
 
 
 def correlation_calculator():
@@ -395,16 +732,63 @@ def correlation_calculator():
                 plot_capabilities_correlation(benchmark_scores[measure1], benchmark_scores[measure2], model_keys, measure1, measure2)
 
 
+def find_capabilities_correlations(models=evaled_models, 
+                                   analysis_fp='./v2_results_analysis/rpm_eval_analysis-{model_name}.json',
+                                   mode='all',
+                                   comparison_data='num_params',
+                                   save_folder='./v2_capabilities_comparisons/'):
+    model_to_textrpm_acc = {}
+    for model in models:
+        with open(analysis_fp.format(model_name=model), 'r') as f:
+            results = json.load(f)
+            if mode == 'all':
+                model_to_textrpm_acc[model] = results['overall_accuracy']
+            else:
+                model_to_textrpm_acc[model] = sum(results['total_num_rules'][str(num)] for num in mode) / sum(results['problem_meta_data']['total_num_rules'][str(num)] for num in mode)
+    
+    comparison_model_to_values = {}
+    for model in models:
+        if model_to_values[model][comparison_data] is not None:
+            comparison_model_to_values[model] = model_to_values[model][comparison_data]
+    
+    # Then align on keys, and plot them against one another
+    plot_models = list(set.intersection(set(models), set(comparison_model_to_values.keys())))
+    print(len(models))
+    print(len(plot_models))
+    textrpm_vals = [model_to_textrpm_acc[model] for model in plot_models]
+    textrpm_vals = [math.log(val) for val in textrpm_vals]
+    comparison_vals = [comparison_model_to_values[model] for model in plot_models]
+    print(len(textrpm_vals))
+    print(len(comparison_vals))
+
+    plt.scatter(comparison_vals, textrpm_vals, color='blue')
+    for i, label in enumerate(plot_models):
+        plt.text(comparison_vals[i], textrpm_vals[i], label, fontsize=6, ha='right')
+    plt.title(f'Variation of TextRPM performance over {comparison_data}')
+    plt.xlabel(comparison_data)
+    plt.ylabel(f'text_rpm_acc (num_rules={mode}) (logged)')
+
+    plt.savefig(f'{save_folder}{comparison_data}_vs_textrpm_acc_log.png', dpi=300)
+
+    r2 = r2_score(comparison_vals, textrpm_vals)
+    corr = np.corrcoef(comparison_vals, textrpm_vals)[0, 1]
+    corr2, _ = pearsonr(comparison_vals, textrpm_vals)
+    corr3, pval = spearmanr(a=comparison_vals, b=textrpm_vals)
+    print(f'R^2 between {comparison_data} and text RPM acc (LOG): {r2} (skl), {corr} (np) | Pearson corr coeff {corr2} | spearman {corr3} / {pval}')
+
+    plt.show()
+    plt.close()
+
+
 def main():
-    # correlation_calculator()
-    # score_breakdown('results/rpm_eval_results_meta-llama-Llama-3-8b-chat-hf_old.json', 'meta-llama/Llama-3-8b-chat-hf', save_folder='analysis/')
-    # score_breakdown('results/rpm_eval_results_Qwen-Qwen1.5-1.8B.json', 'Qwen/Qwen1.5-1.8B')
-    # score_breakdown('results/rpm_eval_results_Qwen-Qwen1.5-1.8B-Chat.json', 'Qwen/Qwen1.5-1.8B-Chat')
-    # score_breakdown('results/rpm_eval_results_meta-llama-Llama-3-70b-chat-hf_old.json',
-    #                 'meta-llama-Llama-3-70b-chat-hf', save_folder='analysis/')
-    # score_breakdown('results/rpm_eval_results_Qwen2-0.5B-Instruct.json', 'Qwen2-0.5B-Instruct')
-    v2_eval_runs_corrections()
-    v2_eval_runs_analysis()
+    # v2_eval_runs_corrections()
+    # v2_eval_runs_analysis(save_figure=True)
+    # comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
+    comparison_options = ['gscore']
+    mode = 'all'
+    # mode = [13, 14]
+    for opt in comparison_options:
+        find_capabilities_correlations(comparison_data=opt, mode=mode)
 
 
 if __name__ == '__main__':
