@@ -15,6 +15,9 @@ set_seed(42)
 
 
 def extract_answer(model_answer):
+    '''
+    Model answer parsing utility
+    '''
     if model_answer.lower().rfind('the final answer is: ') != -1:
         first_cut = model_answer[model_answer.rfind('final answer is: ') + len('final answer is: '):]
         second_cut = first_cut.split(')')[0]
@@ -31,6 +34,10 @@ def extract_answer(model_answer):
 
 
 def eval_model_on_rpm(model_name, model_org, eval_dataset_path, results_save_folder, limit_num_problems=None, api=True, stop_seqs=None):
+    '''
+    Unbatched version of running model eval on a given dataset.
+    This function isn't super general (input dataset must take specific form, output has specific form, etc.), but might be useful skeleton.
+    '''
     if api:
         model = APIModel(model_name=model_name, org=model_org)
     else:
@@ -102,6 +109,10 @@ def eval_model_on_rpm_batched(model_name_or_path,
                               batch_size=2, 
                               model_org=None,
                               use_hf_pipeline=False):
+    '''
+    Batched eval function.
+    Not very general, but might be a useful skeleton.
+    '''
     if api:
         raise NotImplementedError('Haven\'t gotten batched eval set up for API models yet.')
         assert not(api and use_hf_pipeline), 'Use of API (hosted model) is mututally exclusive with use of HF pipeline (local model).'
@@ -120,7 +131,7 @@ def eval_model_on_rpm_batched(model_name_or_path,
         elif limit_num_problems['method'] == 'first_x':
             eval_problems = eval_problems[:limit_num_problems['num_problems']]
         else:
-            raise ValueError('Currenrtly, the only valid methods for limiting number of problems is \'sample\' (randomly sample from all problems) and \'first_x\' (take the first x problems, often roughly the x easiest problems)')
+            raise ValueError('Currently, the only valid methods for limiting number of problems is \'sample\' (randomly sample from all problems) and \'first_x\' (take the first x problems, often roughly the x easiest problems)')
 
     results = []
     total_score = 0
@@ -253,136 +264,6 @@ def main():
                               use_hf_pipeline=args.use_hf_pipeline,
                               api=args.use_api)
 
-    """
-    TODO:
-    X 1. Correctly parse answers from models. Use error analysis to figure out how to do this.
-    X 2. Run evals for larger models. Potentially include better parsing so I don't have to perform the upkeep step
-    X > Start evals for larger models
-    X > Do error analysis for unparsable answers
-    X > Do error analysis for refusal answers
-    X 3. Generate cleaned answers
-    > Restart run of deepseek 67B before going to bed
-    4.1. Regenerate cleaned answers and analysis
-    4.2. Generate output charts to show capabilities correlation etc.
-    5. Do the cool stuff again! Like thinking about the nature of intelligence
-    """
-
-
-    '''
-    Notes from v2 eval run:
-    - Done (all chat/instruct/etc.)
-    - - deepseek 7b
-    - - falcon 7b
-    - - llama 2 7b
-    - - qwen 1.5 .5b
-    - - qwen 1.4 1.8b
-    - - qwen 1.5 4b
-    - - qwen 2 .5b
-    - - qwen 2 1.5b
-    - - qwen 2 7b
-    - - yi 6b
-    - - yi 34b
-    - Need to redo answers for pretty much all of the above. Lots of problems with extraction, particularly []
-        - **It'll be really important to run error analysis on extracted answers and deal with them appropriately**
-
-    
-    - Out of memory error
-    - - falcon 40b
-    - - llama 13B chat
-    - Crashed, need to redo. Check to see why this is the case (unspecified launch failure)
-    - - gemma 1.1 2b it
-    - - gemma 1.1 7b it
-    - - Meta Llama 8B instruct
-    - - Mistral 7B instruct
-    -------> Relaunched all of these with 64 batch size, continuing from save, hoping it takes care of the issue. think batch size is what makes the difference
-    '''
-
-    # TODO: Create base model pipeline
-    # 1. Make sure inference works correctly in ClusterModel class
-    # 2. Generate proper data for evaluating base models 
-    #   -> create good format -> consider what the stop sequence should be. Probably \n\n.
-    #   -> choose proper examples, and proper num examples
-    # 3. Create proper evaluation pipeline for it, particularly for parsing responses, giving it enough response tokens, using the right stop sequence, etc.
-    # 4. Run small scale test of evaluation pipeline with base models
-    # 5. Prepare scripts to run and run them
-
-    # CLUSTER TESTING
-    # eval_model_on_rpm_batched(model_name='Meta-Llama-3-8B-Instruct',
-    #                           api=False,
-    #                           eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                           results_save_folder='results/',
-    #                           limit_num_problems={'method': 'sample', 'num_problems': 20},
-    #                           batch_size=10,
-    #                           use_hf_pipeline=False)
-
-    # Size ~1.5B
-    # # Raw | ~30? / 1000 (easy) problems (~0.03 min per problem); 38 / 1000 = 3.8% correct
-    # eval_model_on_rpm(model_name='Qwen/Qwen1.5-1.8B',
-    #                   model_org='together',
-    #                   api=True,
-    #                   stop_seqs=['''system'''],
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems={'method': 'first_x', 'num_problems': 1000})
-    # # # Chat | ~25 min / 1000 (easy) problems (~0.025 min per problem); 23 / 1000 = 2.3% correct
-    # eval_model_on_rpm(model_name='Qwen/Qwen1.5-1.8B-Chat',      # Answers are significantly dumber than base model, based on looking at a few initial answers
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems={'method': 'first_x', 'num_problems': 1000})
-
-    # # Size ~7B
-    # # # Mistral
-    # eval_model_on_rpm(model_name='mistralai/Mistral-7B-Instruct-v0.3',
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems=None)
-    #
-    # # # LLaMA
-    # # # # Raw
-    # eval_model_on_rpm(model_name='meta-llama/Llama-3-8b-hf',
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems=None)
-    # # # # Chat
-    # # # # # Full eval
-    # eval_model_on_rpm(model_name='meta-llama/Llama-3-8b-chat-hf',
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems=None)
-    # # # # Chat
-    # # # # # Easy subset
-    # eval_model_on_rpm(model_name='meta-llama/Llama-3-8b-chat-hf',
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems={'method': 'first_x', 'num_problems': 1000})
-    #
-    # Size ~70B
-    # # LLaMA
-    # # # Raw / Wasn't answering question. Need few-shot prompt in order to do this.
-    # eval_model_on_rpm(model_name='meta-llama/Meta-Llama-3-70B',
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='rpm_eval_dataset_eval_problems_old.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems=None)
-    # # # # Chat | ~354.6 min / 8942 problems (~0.04 min per problem); 6554 / 8942 = 73.29% correct
-    # eval_model_on_rpm(model_name='meta-llama/Llama-3-70b-chat-hf',
-    #                   model_org='together',
-    #                   api=True,
-    #                   eval_dataset_path='default_rpm_dataset_eval_problems_7-8.json',
-    #                   results_save_folder='results/',
-    #                   limit_num_problems=None)
-    
 
 if __name__ == '__main__':
     main()

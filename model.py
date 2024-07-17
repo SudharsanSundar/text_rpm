@@ -110,6 +110,10 @@ default_falcon_instruct_chat_template = '''{% if messages[0]['role'] == 'system'
 
 
 class APIModel:
+    '''
+    Basic wrapper class for getting text responses from api models. 
+    Currently only implements together ai api calls, but easily extensible.
+    '''
     def __init__(self, model_name, org='together'):
         self.model_name = model_name
         self.org = org
@@ -143,6 +147,9 @@ class APIModel:
 
 
 class ClusterModel:
+    '''
+    Basic wrapper class for running inference on models stored on the cluster.
+    '''
     def __init__(self, 
                  model_name_or_path,
                  do_sample=False,
@@ -176,6 +183,7 @@ class ClusterModel:
                                                           torch_dtype="auto",
                                                           trust_remote_code=True).eval()
         
+        # High level class provided by HF for running inference on HF models
         self.inference_pipeline = pipeline(task='text-generation',
                                            model=self.model,
                                            tokenizer=self.tokenizer,
@@ -218,6 +226,9 @@ class ClusterModel:
         return [generation[0]['generated_text'] for generation in generations]
     
     def get_answer_text_batched_alt(self, prompts, system_prompt=None, max_new_tokens=None):
+        '''
+        Maximally customizable method for running batched inference on models on the cluster
+        '''
         formatted_prompts = prompts
         if self.chat_model:
             formatted_prompts = [self.tokenizer.apply_chat_template([{'role': 'user', 'content': prompt}], add_generation_prompt=True, tokenize=False) for prompt in prompts]

@@ -340,6 +340,9 @@ for key in model_to_param_count.keys():
 
 
 def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False):
+    '''
+    Analyze how models perform on various subsets of the text RPM eval results
+    '''
     with open(eval_results_fp, 'r') as f:
         results = []
         for item in f:
@@ -475,6 +478,9 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
 
 
 def clean_response(raw_txt):
+    '''
+    Model answer parsing utility
+    '''
     new_txt = '('
     valid_chars = [chr(65 + i) for i in range(26)] + [chr(97 + i) for i in range(26)] + ['?'] + [str(i) for i in range(10)]
     good_chars = []
@@ -486,6 +492,9 @@ def clean_response(raw_txt):
 
 
 def extract_answer_better(model_answer):
+    '''
+    Another model answer parsing utility
+    '''
     if model_answer.lower().rfind('the final answer is: ') != -1:
         first_cut = model_answer[model_answer.rfind('final answer is: ') + len('final answer is: '):]
         second_cut = first_cut.split(')')[0]
@@ -502,6 +511,12 @@ def extract_answer_better(model_answer):
 
 
 def reparse_answers(eval_results_fp, model_name, overwrite=False, save_path=None):
+    '''
+    Go through eval results and reparse answers using better answer extraction logic/methods.
+
+    Initial answer parsing methods incorrectly parsed model answers a not insignificant number of times.
+    So I did some error analysis/manual investigation of examples to do more thorough parsing.
+    '''
     results = []
     with open(eval_results_fp, 'r') as f:
         for item in f:
@@ -640,6 +655,9 @@ def reparse_answers(eval_results_fp, model_name, overwrite=False, save_path=None
 
 
 def v2_eval_runs_corrections(results_folder='./v2_results/', save_folder='./v2_results_cleaned/', results_file_prefix='rpm_eval_results_'):
+    '''
+    Run answer reparsing on all eval results, and save to different dir
+    '''
     all_results_files = glob.glob(results_folder + results_file_prefix + '*.json')
     print(len(all_results_files))
     for fp in all_results_files:
@@ -655,6 +673,9 @@ def v2_eval_runs_analysis(results_folder='./v2_results_cleaned/',
                           save_folder='./v2_results_analysis/', 
                           results_file_prefix='rpm_eval_results2_', 
                           save_figure=False):
+    '''
+    Run score breakdown for all eval results
+    '''
     all_results_files = glob.glob(results_folder + results_file_prefix + '*.json')
     print(len(all_results_files), all_results_files)
     for fp in all_results_files:
@@ -663,80 +684,14 @@ def v2_eval_runs_analysis(results_folder='./v2_results_cleaned/',
             score_breakdown(eval_results_fp=fp, model_name=model_name, save_folder=save_folder, save_figure=save_figure)
 
 
-def correlation_calculator():
-    model_keys = ['Qwen1.5-1.8B-Chat', 'Llama3-8B-Chat', 'Llama3-70B-Chat']
-    text_rpm = {
-        'Qwen1.5-1.8B-Chat': 0.02,  # 1000 easy question subset
-        'Llama3-8B-Chat': 0.07827216628775577,  # old sampling of old dataset
-        'Llama3-70B-Chat': 0.7329456497427869  # new sampling of old dataset
-    }
-    mmlu = {
-        'Qwen1.5-1.8B-Chat': 0.468,
-        'Llama3-8B-Chat': 0.684,
-        'Llama3-70B-Chat': 0.82
-    }
-    math = {
-        'Qwen1.5-1.8B-Chat': 0.101,
-        'Llama3-8B-Chat': 0.3,
-        'Llama3-70B-Chat': 0.504
-    }
-    human_eval = {
-        'Qwen1.5-1.8B-Chat': 0.201,
-        'Llama3-8B-Chat': 0.622,
-        'Llama3-70B-Chat': 0.817
-    }
-    lm_sys_arena = {
-        'Qwen1.5-1.8B-Chat': None,
-        'Llama3-8B-Chat': 1157,
-        'Llama3-70B-Chat': 1207
-    }
-    arc_agi = {
-        'Qwen1.5-1.8B-Chat': None,
-        'Llama3-8B-Chat': None,
-        'Llama3-70B-Chat': None
-    }
-
-    benchmark_scores = {
-        'text_rpm': text_rpm,
-        'mmlu': mmlu,
-        'math': math,
-        'human_eval': human_eval,
-        # 'lm_sys_arena': lm_sys_arena,
-    }
-
-    def plot_capabilities_correlation(dictX, dictY, keys, titleX, titleY):
-        for key in keys:
-            plt.scatter([dictX[key]], [dictY[key]], label=key)
-
-        plt.xlabel(titleX)
-        plt.ylabel(titleY)
-        plt.title('Correlation between Capabilities Measures')
-
-        x_data = [dictX[key] for key in keys]
-        y_data = [dictY[key] for key in keys]
-        r2 = r2_score(x_data, y_data)
-
-        corr = np.corrcoef(x_data, y_data)[0, 1]
-
-        corr2, _ = pearsonr(x_data, y_data)
-        corr3, pval = spearmanr(a=x_data, b=y_data)
-        print(f'R^2 between {measure1} and {measure2}: {corr}, {corr2}, {corr3} / {pval}')
-
-        plt.legend()
-        plt.text(0.5, 0.5, f'$pearson = {corr:.2f}$')
-        plt.show()
-
-    for measure1 in benchmark_scores:
-        for measure2 in benchmark_scores:
-            if measure1 != measure2 and 'text_rpm' in [measure1, measure2]:
-                plot_capabilities_correlation(benchmark_scores[measure1], benchmark_scores[measure2], model_keys, measure1, measure2)
-
-
 def find_capabilities_correlations(models=evaled_models, 
                                    analysis_fp='./v2_results_analysis/rpm_eval_analysis-{model_name}.json',
                                    mode='all',
                                    comparison_data='num_params',
                                    save_folder='./v2_capabilities_comparisons/'):
+    '''
+    Plot model performance on text rpm tasks against various capabilities-related measures for the same models, and find corresponding correlation coefficients
+    '''
     model_to_textrpm_acc = {}
     for model in models:
         with open(analysis_fp.format(model_name=model), 'r') as f:
