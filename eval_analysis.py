@@ -100,7 +100,7 @@ model_to_gscore = {
     'Qwen1.5-4B-Chat': -3.44,
     'Qwen1.5-7B-Chat': -2.34,
     'Llama-2-7b-chat-hf': -1.85,
-    # 'gemma-1.1-7b-it': -1.12,
+    'gemma-1.1-7b-it': -1.12,
     'Llama-2-13b-chat-hf': -0.76,
     'Yi-6B-Chat': -0.67,
     'Qwen1.5-14B-Chat': -0.66,
