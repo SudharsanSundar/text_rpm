@@ -69,8 +69,7 @@ python eval.py \
    --model_name_or_path "${model_path}" \
    --eval_dataset_path "datasets/default_rpm_dataset_eval_problems_v2.json" \
    --batch_size $batch_size \
-   --results_save_folder "v2_results/" \
-   --limit_num_problems first_x,32
+   --results_save_folder "v2_results/"
 
 EOF
 
