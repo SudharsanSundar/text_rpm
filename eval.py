@@ -33,7 +33,13 @@ def extract_answer(model_answer):
             return 'Could not parse answer.'
 
 
-def eval_model_on_rpm(model_name, model_org, eval_dataset_path, results_save_folder, limit_num_problems=None, api=True, stop_seqs=None):
+def eval_model_on_rpm(model_name,  
+                      eval_dataset_path, 
+                      results_save_folder, 
+                      model_org=None,
+                      limit_num_problems=None, 
+                      api=True, 
+                      stop_seqs=None):
     '''
     Unbatched version of running model eval on a given dataset.
     This function isn't super general (input dataset must take specific form, output has specific form, etc.), but might be useful skeleton.
@@ -58,6 +64,13 @@ def eval_model_on_rpm(model_name, model_org, eval_dataset_path, results_save_fol
     results = []
     total_score = 0
     start_time = time.time()
+
+    base_path = '/data/sudharsan_sundar/text_rpm/' # '/Users/sudharsansundar/text_rpm/'
+    save_path = 'rpm_eval_results_' + model.model_name.replace('/', '-') + '.json'
+    if results_save_folder is not None:
+        save_path = results_save_folder + save_path
+    save_path = base_path + save_path
+
     for problem in eval_problems:
         prompt = problem['problem_prompt']
         correct_answer = problem['problem_answer']
@@ -88,13 +101,21 @@ def eval_model_on_rpm(model_name, model_org, eval_dataset_path, results_save_fol
         print(result['score'])
         print('-'*100)
 
-    save_path = 'rpm_eval_results_' + model_name.replace('/', '-') + '.json'
-    if results_save_folder is not None:
-        save_path = results_save_folder + save_path
-
-    with open(save_path, 'w') as f:
-        for result in results:
+        with open(save_path, 'a') as f:
             f.write(json.dumps(result) + '\n')
+        
+        if len(model_answer) == 0:
+            print('EMPTY MODEL RESPONSE!!!')
+            raise ValueError('Received empty model response.')
+    
+    total_score = sum(result['score'] for result in results)
+    totals = {'total_score': total_score, 'fraction_correct': total_score / len(results), 'total_time_mins': (time.time() - start_time) / 60, 'num_evaled_this_run': len(results)}
+    
+    totals_save_path = 'rpm_eval_totals_' + model.model_name.replace('/', '-') + '.json'
+    if results_save_folder is not None:
+        totals_save_path = results_save_folder + totals_save_path
+    with open(totals_save_path, 'w') as f:
+        json.dump(totals, f, indent=4)
 
     print(f'TOTAL SCORE: {total_score} / {len(eval_problems)} problems correct ({total_score / len(eval_problems)})')
     print(f'TOTAL TIME TAKEN FOR EVAL: {(time.time() - start_time) / 60} min ({(time.time() - start_time) / (60 * len(eval_problems))} min on avg per problem)')
@@ -254,13 +275,19 @@ def eval_model_on_rpm_batched(model_name_or_path,
 
 def main():
     parser = argparse.ArgumentParser(description='Evaluate models on text RPM problems using batched inputs.')
+
+    # Required
     parser.add_argument('--model_name_or_path', type=str, required=True, help='Name of model or path to model to evaluate.')
     parser.add_argument('--eval_dataset_path', type=str, required=True, help='Path to eval problems from text rpm dataset.')
     parser.add_argument('--results_save_folder', type=str, required=True, help='Path to folder to save results in.')
     parser.add_argument('--batch_size', type=int, required=True, help='Batch size to use when doing model inference.')
+
+    # Optional
     parser.add_argument('--limit_num_problems', type=str, default=None, help='Whether to use a subset of problems for testing. Format as \'method,num_problems\', such as \'first_x,100\'.')
     parser.add_argument('--use_hf_pipeline', type=bool, default=False, help='Whether to use the HF pipeline class to conduct inference, or use a custom implementation.')
+    parser.add_argument('--model_org', type=str, default=None, help='Which API provider to use with a given api model.')
     parser.add_argument('--use_api', type=bool, default=False, help='Whether to use a model API. Not yet implemented.')
+
     args = parser.parse_args()
 
     eval_model_on_rpm_batched(model_name_or_path=args.model_name_or_path,
@@ -270,6 +297,13 @@ def main():
                               limit_num_problems=args.limit_num_problems if args.limit_num_problems is None else {'method': args.limit_num_problems.split(',')[0], 'num_problems': int(args.limit_num_problems.split(',')[1])},
                               use_hf_pipeline=args.use_hf_pipeline,
                               api=args.use_api)
+
+    # eval_model_on_rpm(model_name=args.model_name_or_path,
+    #                   model_org=args.model_org,
+    #                   eval_dataset_path=args.eval_dataset_path,
+    #                   results_save_folder=args.results_save_folder,
+    #                   limit_num_problems=args.limit_num_problems if args.limit_num_problems is None else {'method': args.limit_num_problems.split(',')[0], 'num_problems': int(args.limit_num_problems.split(',')[1])},
+    #                   api=args.use_api)
 
 
 if __name__ == '__main__':

@@ -21,7 +21,6 @@ from transformers import (
     set_seed
 )
 import pprint as ppr
-import torch
 
 set_seed(42)
 
