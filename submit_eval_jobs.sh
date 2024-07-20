@@ -19,11 +19,12 @@ model_directories=(     # Key: "\t#" = large model, "_##" = finished eval, "_/#"
     # "/data/public_models/huggingface/tiiuae/falcon-40b-instruct" #/           # !!! Careful of non-128-divisible batch size !!! running out of memory even with 64 batch size? -> even 32 by a little?? -> still crashing at 24, and it's bad 
     # "/data/public_models/huggingface/tiiuae/falcon-180B-chat" #/               # has some problem with 'token_type_ids' passed in for generate kwargs
     # "/data/public_models/huggingface/deepseek-ai/deepseek-llm-7b-chat" ##
-    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-67b-chat"     # ran out 128 -> running at 64
+    # "/data/public_models/huggingface/deepseek-ai/deepseek-llm-67b-chat" ##     # ran out 128 -> running at 64
     # "/data/public_models/huggingface/google/gemma-1.1-2b-it" ##
     # "/data/public_models/huggingface/google/gemma-1.1-7b-it" ##
     # "/data/public_models/huggingface/01-ai/Yi-6B-Chat" ##
     # "/data/public_models/huggingface/01-ai/Yi-34B-Chat" ##
+    "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it"
 )
 
 # Initialize an empty array to hold the second halves
@@ -40,8 +41,8 @@ for i in "${!model_directories[@]}"; do
     model_path="${model_directories[i]}"
     model_name="${model_names[i]}"
     job_name="ss_${model_name}_text-rpm_eval"
-    gpus_per_node=4
-    batch_size=64       # Must be a power of 2 in order to make use of the "continue from previous save" feature of eval script
+    gpus_per_node=2
+    batch_size=2       # Must be a power of 2 in order to make use of the "continue from previous save" feature of eval script
 
     echo "${model_path}"
     echo "${model_name}"
@@ -68,7 +69,8 @@ python eval.py \
    --model_name_or_path "${model_path}" \
    --eval_dataset_path "datasets/default_rpm_dataset_eval_problems_v2.json" \
    --batch_size $batch_size \
-   --results_save_folder "v2_results/"
+   --results_save_folder "v2_results/" \
+   --limit_num_problems first_x,32
 
 EOF
 

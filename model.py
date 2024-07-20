@@ -21,6 +21,7 @@ from transformers import (
     set_seed
 )
 import pprint as ppr
+import torch
 
 set_seed(42)
 
@@ -80,7 +81,8 @@ chat_model_directories = [
     "/data/public_models/huggingface/google/gemma-1.1-2b-it",  # Google (Gemma) models, gen 1.1
     "/data/public_models/huggingface/google/gemma-1.1-7b-it",
     "/data/public_models/huggingface/01-ai/Yi-6B-Chat",  # 01-ai (Yi) models, gen 1
-    "/data/public_models/huggingface/01-ai/Yi-34B-Chat"
+    "/data/public_models/huggingface/01-ai/Yi-34B-Chat",
+    "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it"
 ]
 
 base_model_name_to_path = {path.split('/')[-1]: path for path in base_model_directories}
@@ -170,6 +172,7 @@ class ClusterModel:
                                                        use_fast=False,
                                                        padding_side='left',
                                                        trust_remote_code=True)
+        
         if self.model_name in ['falcon-7b-instruct', 'falcon-40b-instruct']:
             self.tokenizer.chat_template = default_falcon_instruct_chat_template
         
@@ -248,16 +251,32 @@ class ClusterModel:
 
 def main():
     print('Starting script...')
-    test_problem = '''Consider the following pattern. Each tuple (*) represents (shape type).\nRow 1: (C), (B), (A)\nRow 2: (A), (C), (B)\nRow 3: (B), (A), (?)\n\nPlease determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as \"The final answer is: [your final answer].\"'''
-    for model_name in chat_model_name_to_path:
+    # test_problem = '''Consider the following pattern. Each tuple (*) represents (shape type).\nRow 1: (C), (B), (A)\nRow 2: (A), (C), (B)\nRow 3: (B), (A), (?)\n\nPlease determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as \"The final answer is: [your final answer].\"'''
+    test_problem = '''Consider the following pattern. Each tuple (_) represents (shape type).
+Row 1: (A), (A), (A)
+Row 2: (B), (B), (B)
+Row 3: (C), (C), (?)
+
+Please determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as "The final answer is: [your final answer]."'''
+    test_problem2 = '''Consider the following pattern. Each tuple (_) represents (shape type).
+Row 1: (A), (A), (A)
+Row 2: (C), (C), (C)
+Row 3: (B), (B), (?)
+
+Please determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as "The final answer is: [your final answer]."'''
+    model_names = ['gemma-2-9b-it']
+    for model_name in model_names:
         print('MODEL:', model_name)
         test_model = ClusterModel(model_name)
-        answers = test_model.get_answer_text_batched_alt(['What is the capital of Mars?', 'Who are you, and why are you here?', test_problem])
+        answers = test_model.get_answer_text_batched([test_problem, test_problem2])
 
         for answer in answers:
             print(answer)
             print('/ / / / /')
         print('-' * 100)
+    
+    # tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b-it")
+    # model = AutoModelForCausalLM.from_pretrained("google/gemma-2-9b-it")
 
 
 if __name__ == '__main__':

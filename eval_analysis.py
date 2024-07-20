@@ -28,11 +28,12 @@ evaled_model_fps = [
     # "/data/public_models/huggingface/tiiuae/falcon-40b-instruct", #/           # !!! Careful of non-128-divisible batch size !!! running out of memory even with 64 batch size? -> even 32 by a little?? -> still crashing at 24, and it's bad 
     # "/data/public_models/huggingface/tiiuae/falcon-180B-chat", #/               # has some problem with 'token_type_ids' passed in for generate kwargs
     "/data/public_models/huggingface/deepseek-ai/deepseek-llm-7b-chat", ##
-    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-67b-chat",     # ran out 128 -> running at 64
+    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-67b-chat", ##     # ran out 128 -> running at 64
     "/data/public_models/huggingface/google/gemma-1.1-2b-it", ##
     "/data/public_models/huggingface/google/gemma-1.1-7b-it", ##
     "/data/public_models/huggingface/01-ai/Yi-6B-Chat", ##
-    "/data/public_models/huggingface/01-ai/Yi-34B-Chat" ##
+    "/data/public_models/huggingface/01-ai/Yi-34B-Chat", ##
+    "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it"
 ]
 
 evaled_models = [fp.split('/')[-1] for fp in evaled_model_fps]

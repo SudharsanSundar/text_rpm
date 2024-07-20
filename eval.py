@@ -156,7 +156,7 @@ def eval_model_on_rpm_batched(model_name_or_path,
         problems_already_done = 0
     
     if use_hf_pipeline:
-        raise NotImplementedError('Check this code before using it! I think I\'ve made changes to other parts of the pipeline that could break this')
+        # raise NotImplementedError('Check this code before using it! I think I\'ve made changes to other parts of the pipeline that could break this')
         model_answers = model.get_answer_text_batched(eval_problems)
 
         for problem, model_answer in zip(eval_problems, model_answers):
@@ -185,6 +185,10 @@ def eval_model_on_rpm_batched(model_name_or_path,
             print('SCORE | TOTAL SCORE')
             print(result['score'], '|', total_score, '/', len(results))
             print('-'*100)
+        
+        with open(save_path, 'a') as f:
+            for result in new_results:
+                f.write(json.dumps(result) + '\n')
     else:
         for i in range(0, len(eval_problems), batch_size):
             if i < problems_already_done:   # skip already evaled problems
@@ -221,6 +225,9 @@ def eval_model_on_rpm_batched(model_name_or_path,
                 print(extracted_answer, '|', result['correct_answer'])
                 print('SCORE | TOTAL SCORE')
                 print(result['score'], '|', total_score, '/', len(results))
+                if len(model_answer) == 0:
+                    print('EMPTY RESPONSE!!!')
+                    raise ValueError('Empty response from model')
                 print('-'*100)
 
             with open(save_path, 'a') as f:
