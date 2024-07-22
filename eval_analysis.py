@@ -61,7 +61,8 @@ model_to_param_count = {
   "gemma-1.1-2b-it": "2B",
   "gemma-1.1-7b-it": "7B",
   "Yi-6B-Chat": "6B",
-  "Yi-34B-Chat": "34B"
+  "Yi-34B-Chat": "34B",
+  "google-gemma-2-9b-it": "9B"
 }
 model_to_param_count = {key: float(value[:-1]) for key, value in zip(model_to_param_count.keys(), model_to_param_count.values()) if key != 'Mixtral-8x7B-Instruct-v0.1'}
 model_to_param_count['Mixtral-8x7B-Instruct-v0.1'] = 45
@@ -328,12 +329,17 @@ model_to_values = {
         'gsm8k': 75.97,
         'math': None,
     },
+    "google-gemma-2-9b-it": {},
 }
 print(set(model_to_param_count.keys()) - set(model_to_values.keys()))
 for key in model_to_param_count.keys():
     model_to_values[key]['num_params'] = model_to_param_count[key]
+
     if key in model_to_tokens_seen:
         model_to_values[key]['tokens_seen'] = model_to_tokens_seen[key]
+    else:
+        model_to_values[key]['tokens_seen'] = None
+    
     if key in model_to_gscore:
         model_to_values[key]['gscore'] = model_to_gscore[key]
     else:
@@ -704,7 +710,7 @@ def find_capabilities_correlations(models=evaled_models,
     
     comparison_model_to_values = {}
     for model in models:
-        if model_to_values[model][comparison_data] is not None:
+        if model_to_values[model].get(comparison_data, None) is not None:
             comparison_model_to_values[model] = model_to_values[model][comparison_data]
     
     # Then align on keys, and plot them against one another
@@ -712,7 +718,7 @@ def find_capabilities_correlations(models=evaled_models,
     print(len(models))
     print(len(plot_models))
     textrpm_vals = [model_to_textrpm_acc[model] for model in plot_models]
-    textrpm_vals = [math.log(val) for val in textrpm_vals]
+    textrpm_vals = [math.log(max(val, 0.0000000001)) for val in textrpm_vals]
     comparison_vals = [comparison_model_to_values[model] for model in plot_models]
     print(len(textrpm_vals))
     print(len(comparison_vals))
@@ -737,10 +743,10 @@ def find_capabilities_correlations(models=evaled_models,
 
 
 def main():
-    # v2_eval_runs_corrections()
-    # v2_eval_runs_analysis(save_figure=True)
-    # comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
-    comparison_options = ['gscore']
+    v2_eval_runs_corrections()
+    v2_eval_runs_analysis(save_figure=True)
+    comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
+    # comparison_options = ['gscore']
     mode = 'all'
     # mode = [13, 14]
     for opt in comparison_options:
