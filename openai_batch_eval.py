@@ -27,8 +27,7 @@ def generate_oai_batch_eval_file(eval_problems_fp, save_fp, model_name='gpt-4o-m
                 ],
                 'max_tokens': 2048,
                 'temperature': 0.0,
-                'top_p': 0.0,
-                'top_k': 1
+                'seed': 42
             },
         }
         problem_dicts.append(api_call_dict)
@@ -63,9 +62,9 @@ def submit_batch_job(batch_fp):
     print(response)
 
 
-# TODO
 def check_on_batch_jobs():
-    ppr.pprint(client.batches.list(limit=10))
+    print('CURRENT BATCH JOBS:')
+    print(client.batches.list(limit=10))
 
 
 def main():
