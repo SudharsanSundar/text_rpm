@@ -67,10 +67,26 @@ def check_on_batch_jobs():
     print(client.batches.list(limit=10))
 
 
+def retrieve_and_save_job_result(output_file_id, eval_problems_fp, save_fp):
+    file_response = client.files.content(output_file_id).text
+    output_sorted = [None] * len(file_response)
+    
+    # TODO: Map batch results to eval problems, 
+    # TODO: create list holding them in the desired format
+    
+    with open(save_fp, 'w') as f:
+        for item in output_sorted:
+            f.write(json.dumps(item) + '\n')
+
+
 def main():
     # Reference pg: https://platform.openai.com/docs/guides/batch/getting-started
     eval_problems_fp = './datasets/default_rpm_dataset_eval_problems_v2.json'
     batch_fp = './datasets/default_rpm_dataset_eval_problems_v2_oai_batch.jsonl'
+    output_file_id = 'file-fmCLFblBKykGMBm9HXrHWnBh'
+
+    # TODO: Make sure save_fp is correct and can work with existing eval_analysis script
+    output_save_fp = './v2_results/rpm_eval_results_gpt40-mini.json'
 
     # generate_oai_batch_eval_file(
     #     eval_problems_fp=eval_problems_fp,
@@ -79,7 +95,9 @@ def main():
 
     # submit_batch_job(batch_fp)
 
-    check_on_batch_jobs()
+    # check_on_batch_jobs()
+
+    retrieve_and_save_job_result(output_file_id, output_save_fp)
 
 
 if __name__ == '__main__':
