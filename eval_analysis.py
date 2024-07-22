@@ -33,7 +33,8 @@ evaled_model_fps = [
     "/data/public_models/huggingface/google/gemma-1.1-7b-it", ##
     "/data/public_models/huggingface/01-ai/Yi-6B-Chat", ##
     "/data/public_models/huggingface/01-ai/Yi-34B-Chat", ##
-    "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it"
+    # "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it",               # problems with empty messages
+    "google-gemma-2-9b-it"                                                  # together api version
 ]
 
 evaled_models = [fp.split('/')[-1] for fp in evaled_model_fps]

@@ -251,31 +251,32 @@ class ClusterModel:
 def main():
     print('Starting script...')
     # test_problem = '''Consider the following pattern. Each tuple (*) represents (shape type).\nRow 1: (C), (B), (A)\nRow 2: (A), (C), (B)\nRow 3: (B), (A), (?)\n\nPlease determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as \"The final answer is: [your final answer].\"'''
-    test_problem = '''Consider the following pattern. Each tuple (_) represents (shape type).
-Row 1: (A), (A), (A)
-Row 2: (B), (B), (B)
-Row 3: (C), (C), (?)
+#     test_problem = '''Consider the following pattern. Each tuple (_) represents (shape type).
+# Row 1: (A), (A), (A)
+# Row 2: (B), (B), (B)
+# Row 3: (C), (C), (?)
 
-Please determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as "The final answer is: [your final answer]."'''
-    test_problem2 = '''Consider the following pattern. Each tuple (_) represents (shape type).
-Row 1: (A), (A), (A)
-Row 2: (C), (C), (C)
-Row 3: (B), (B), (?)
+# Please determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as "The final answer is: [your final answer]."'''
+#     test_problem2 = '''Consider the following pattern. Each tuple (_) represents (shape type).
+# Row 1: (A), (A), (A)
+# Row 2: (C), (C), (C)
+# Row 3: (B), (B), (?)
 
-Please determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as "The final answer is: [your final answer]."'''
-    model_names = ['gemma-2-9b-it']
-    for model_name in model_names:
-        print('MODEL:', model_name)
-        test_model = ClusterModel(model_name)
-        answers = test_model.get_answer_text_batched([test_problem, test_problem2])
+# Please determine the correct values for the final tuple of Row 3, (?), which completes the pattern. Please clearly state your final answer as "The final answer is: [your final answer]."'''
+#     model_names = ['gemma-2-9b-it']
+#     for model_name in model_names:
+#         print('MODEL:', model_name)
+#         test_model = ClusterModel(model_name)
+#         answers = test_model.get_answer_text_batched([test_problem, test_problem2])
 
-        for answer in answers:
-            print(answer)
-            print('/ / / / /')
-        print('-' * 100)
+#         for answer in answers:
+#             print(answer)
+#             print('/ / / / /')
+#         print('-' * 100)
     
-    # tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-9b-it")
-    # model = AutoModelForCausalLM.from_pretrained("google/gemma-2-9b-it")
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-27b-it")
+    model = AutoModelForCausalLM.from_pretrained("google/gemma-2-27b-it")
+    print('MODELS CALLED')
 
 
 if __name__ == '__main__':
