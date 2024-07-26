@@ -8,6 +8,7 @@ import glob
 import os
 import re
 import math
+from Levenshtein import distance as edit_distance
 
 evaled_model_fps = [
     "/data/public_models/huggingface/meta-llama/Meta-Llama-3-70B-Instruct", ##      # running at 128 -> running again at 128 for speed
@@ -33,8 +34,10 @@ evaled_model_fps = [
     "/data/public_models/huggingface/google/gemma-1.1-7b-it", ##
     "/data/public_models/huggingface/01-ai/Yi-6B-Chat", ##
     "/data/public_models/huggingface/01-ai/Yi-34B-Chat", ##
-    # "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it",               # problems with empty messages
-    "google-gemma-2-9b-it"                                                  # together api version
+    # "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it",               # problems with empty messages. keep out of eval analyses
+    "google-gemma-2-9b-it",                                                # together api version
+    "gpt-4o-mini",
+    "google/gemma-2-27b-it"
 ]
 
 evaled_models = [fp.split('/')[-1] for fp in evaled_model_fps]
@@ -63,9 +66,11 @@ model_to_param_count = {
   "gemma-1.1-7b-it": "7B",
   "Yi-6B-Chat": "6B",
   "Yi-34B-Chat": "34B",
-  "google-gemma-2-9b-it": "9B"
+  "google-gemma-2-9b-it": "9B",
+  "gpt-4o-mini": None,
+  "gemma-2-27b-it": "27B"
 }
-model_to_param_count = {key: float(value[:-1]) for key, value in zip(model_to_param_count.keys(), model_to_param_count.values()) if key != 'Mixtral-8x7B-Instruct-v0.1'}
+model_to_param_count = {key: float(value[:-1]) for key, value in zip(model_to_param_count.keys(), model_to_param_count.values()) if key not in ['Mixtral-8x7B-Instruct-v0.1', 'gpt-4o-mini']}
 model_to_param_count['Mixtral-8x7B-Instruct-v0.1'] = 45
 
 model_to_tokens_seen = {
@@ -331,20 +336,14 @@ model_to_values = {
         'math': None,
     },
     "google-gemma-2-9b-it": {},
+    "gpt-4o-mini": {},
+    "gemma-2-27b-it": {}
 }
 print(set(model_to_param_count.keys()) - set(model_to_values.keys()))
 for key in model_to_param_count.keys():
     model_to_values[key]['num_params'] = model_to_param_count[key]
-
-    if key in model_to_tokens_seen:
-        model_to_values[key]['tokens_seen'] = model_to_tokens_seen[key]
-    else:
-        model_to_values[key]['tokens_seen'] = None
-    
-    if key in model_to_gscore:
-        model_to_values[key]['gscore'] = model_to_gscore[key]
-    else:
-        model_to_values[key]['gscore'] = None
+    model_to_values[key]['tokens_seen'] = model_to_tokens_seen.get(key, None)    
+    model_to_values[key]['gscore'] = model_to_gscore.get(key, None)
 
 
 def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False):
@@ -361,6 +360,7 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
             'num_nonconstant_rules': {},
             'num_distribute_3_rules': {},
             'num_unique_rules': {},
+            'edit_distance': {},
             'num_unparsable_answers': 0,
             'num_parsed_but_incorrectly_formatted_answers': 0,
             'num_formatted_but_improper_answer': 0,
@@ -370,7 +370,8 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
             'total_num_rules': {},
             'num_nonconstant_rules': {},
             'num_distribute_3_rules': {},
-            'num_unique_rules': {}
+            'num_unique_rules': {},
+            'edit_distance': {}
         }
 
         for result in results:
@@ -392,6 +393,7 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
                 num_distribute_3_rules, 0) + 1
             total_in_category['num_unique_rules'][num_unique_rules] = total_in_category['num_unique_rules'].get(
                 num_unique_rules, 0) + 1
+            total_in_category['edit_distance'][num_rules] = total_in_category['edit_distance'].get(num_rules, 0) + len(result['correct_answer'])
 
             score_breakdown_results['total_num_rules'][num_rules] = score_breakdown_results['total_num_rules'].get(
                 num_rules, 0) + result['score']
@@ -404,6 +406,7 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
             score_breakdown_results['num_unique_rules'][num_unique_rules] = score_breakdown_results[
                                                                                 'num_unique_rules'].get(
                 num_unique_rules, 0) + result['score']
+            score_breakdown_results['edit_distance'][num_rules] = score_breakdown_results['edit_distance'].get(num_rules, 0) + len(result['correct_answer']) if len(result['extracted_answer']) == 0 else score_breakdown_results['edit_distance'].get(num_rules, 0) + min(edit_distance(result['extracted_answer'], result['correct_answer']), len(result['extracted_answer']) * 2)      # TODO: hacky cap of edit distance to 2x correct answer len
 
             extracted_answer = result['extracted_answer']
             if extracted_answer == 'Could not parse answer.':
@@ -456,7 +459,7 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
     with open(save_fp + '.json', 'w') as f:
         json.dump(score_breakdown_results, f, indent=4)
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 5))
+    fig, axes = plt.subplots(3, 1, figsize=(12, 5))
     del fraction_correct['num_nonconstant_rules']
     del fraction_correct['num_distribute_3_rules']
 
@@ -696,7 +699,8 @@ def find_capabilities_correlations(models=evaled_models,
                                    analysis_fp='./v2_results_analysis/rpm_eval_analysis-{model_name}.json',
                                    mode='all',
                                    comparison_data='num_params',
-                                   save_folder='./v2_capabilities_comparisons/'):
+                                   save_folder='./v2_capabilities_comparisons/',
+                                   pause=False):
     '''
     Plot model performance on text rpm tasks against various capabilities-related measures for the same models, and find corresponding correlation coefficients
     '''
@@ -716,13 +720,14 @@ def find_capabilities_correlations(models=evaled_models,
     
     # Then align on keys, and plot them against one another
     plot_models = list(set.intersection(set(models), set(comparison_model_to_values.keys())))
-    print(len(models))
-    print(len(plot_models))
+    # print(len(models))
+    print('Num models used in comparison:', len(plot_models))
     textrpm_vals = [model_to_textrpm_acc[model] for model in plot_models]
     textrpm_vals = [math.log(max(val, 0.0000000001)) for val in textrpm_vals]
+
     comparison_vals = [comparison_model_to_values[model] for model in plot_models]
-    print(len(textrpm_vals))
-    print(len(comparison_vals))
+    # print(len(textrpm_vals))
+    # print(len(comparison_vals))
 
     plt.scatter(comparison_vals, textrpm_vals, color='blue')
     for i, label in enumerate(plot_models):
@@ -737,21 +742,34 @@ def find_capabilities_correlations(models=evaled_models,
     corr = np.corrcoef(comparison_vals, textrpm_vals)[0, 1]
     corr2, _ = pearsonr(comparison_vals, textrpm_vals)
     corr3, pval = spearmanr(a=comparison_vals, b=textrpm_vals)
-    print(f'R^2 between {comparison_data} and text RPM acc (LOG): {r2} (skl), {corr} (np) | Pearson corr coeff {corr2} | spearman {corr3} / {pval}')
+    print(f'Pearson correlation coeff between {comparison_data} and text RPM acc (LOGGED): {corr} (np), {corr2} (scipy) | Spearman: {corr3} / pval {pval} | R^2: {r2} (skl)')
 
     plt.show()
     plt.close()
 
+    if pause:
+        response = input('Continue? ')
+        if response == 'y':
+            print('Continuing!')
+        else:
+            print('Response not recognized, continuing...')
+
 
 def main():
-    v2_eval_runs_corrections()
-    v2_eval_runs_analysis(save_figure=True)
-    comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
-    # comparison_options = ['gscore']
-    mode = 'all'
-    # mode = [13, 14]
-    for opt in comparison_options:
-        find_capabilities_correlations(comparison_data=opt, mode=mode)
+    # v2_eval_runs_corrections()
+    # v2_eval_runs_analysis(save_figure=True)
+    # comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
+    comparison_options = ['gscore']
+    # mode = 'all'
+    # mode = [10, 11, 12, 13, 14]
+    for i in range(1, 15, 1):
+        # mode = [j for j in range(1, i + 1, 1)]
+        # mode = [i + j* for j in range(i, i + 1, 1)]
+        mode = [(i + j * 4) % 13 + 1 for j in range(3)]
+        print('MODE:', mode)
+        for opt in comparison_options:
+            find_capabilities_correlations(comparison_data=opt, mode=mode, pause=True)
+        print('-' * 100)
 
 
 if __name__ == '__main__':

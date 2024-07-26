@@ -81,7 +81,8 @@ chat_model_directories = [
     "/data/public_models/huggingface/google/gemma-1.1-7b-it",
     "/data/public_models/huggingface/01-ai/Yi-6B-Chat",  # 01-ai (Yi) models, gen 1
     "/data/public_models/huggingface/01-ai/Yi-34B-Chat",
-    "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it"
+    "/data/sudharsan_sundar/downloaded_models/gemma-2-9b-it",
+    "gpt-4o-mini"
 ]
 
 base_model_name_to_path = {path.split('/')[-1]: path for path in base_model_directories}

@@ -135,8 +135,7 @@ def eval_model_on_rpm_batched(model_name_or_path,
     Not very general, but might be a useful skeleton.
     '''
     if api:
-        raise NotImplementedError('Haven\'t gotten batched eval set up for API models yet.')
-        assert not(api and use_hf_pipeline), 'Use of API (hosted model) is mututally exclusive with use of HF pipeline (local model).'
+        raise NotImplementedError('Haven\'t gotten batched eval set up for API models yet. (Use openai_batch_eval.py if you want to use the OpenAI API.)')
     else:
         model = ClusterModel(model_name_or_path=model_name_or_path, batch_size=batch_size)      # batch size arg only relevant for hf pipeline actually
 
