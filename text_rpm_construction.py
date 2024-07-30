@@ -77,6 +77,7 @@ class RPMProblem:
     def get_grid(self):
         return self.grid
 
+
 class RPMRule:
     '''
     Wrapper class for rules/patterns used to vary element values across a rows of an RPM problem.
@@ -93,7 +94,6 @@ class RPMRule:
         self.num_rows = num_rows
         self.num_cols = num_cols
         self.attr_to_values = {attr_name: [[None for j in range(self.num_cols)] for i in range(self.num_rows)] for attr_name in self.attr_names}
-        print(self.attr_names)
     
     def apply_rule() -> Dict[str, List[List[int]]]:
         pass

@@ -345,6 +345,8 @@ for key in model_to_param_count.keys():
     model_to_values[key]['tokens_seen'] = model_to_tokens_seen.get(key, None)    
     model_to_values[key]['gscore'] = model_to_gscore.get(key, None)
 
+ppr.pprint(set.intersection(set(list(model_to_gscore.keys())), set(list(model_to_param_count.keys()))))
+
 
 def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False):
     '''
@@ -665,7 +667,7 @@ def reparse_answers(eval_results_fp, model_name, overwrite=False, save_path=None
                 f.write(json.dumps(result) + '\n')
 
 
-def v2_eval_runs_corrections(results_folder='./v2_results/', save_folder='./v2_results_cleaned/', results_file_prefix='rpm_eval_results_'):
+def v4_eval_runs_corrections(results_folder='./v4_results/', save_folder='./v4_results_cleaned/', results_file_prefix='rpm_eval_results_'):
     '''
     Run answer reparsing on all eval results, and save to different dir
     '''
@@ -680,8 +682,8 @@ def v2_eval_runs_corrections(results_folder='./v2_results/', save_folder='./v2_r
         )
 
 
-def v2_eval_runs_analysis(results_folder='./v2_results_cleaned/', 
-                          save_folder='./v2_results_analysis/', 
+def v4_eval_runs_analysis(results_folder='./v4_results_cleaned/', 
+                          save_folder='./v4_results_analysis/', 
                           results_file_prefix='rpm_eval_results2_', 
                           save_figure=False):
     '''
@@ -696,10 +698,10 @@ def v2_eval_runs_analysis(results_folder='./v2_results_cleaned/',
 
 
 def find_capabilities_correlations(models=evaled_models, 
-                                   analysis_fp='./v2_results_analysis/rpm_eval_analysis-{model_name}.json',
+                                   analysis_fp='./v4_results_analysis/rpm_eval_analysis-{model_name}.json',
                                    mode='all',
                                    comparison_data='num_params',
-                                   save_folder='./v2_capabilities_comparisons/',
+                                   save_folder='./v4_capabilities_comparisons/',
                                    pause=False):
     '''
     Plot model performance on text rpm tasks against various capabilities-related measures for the same models, and find corresponding correlation coefficients
@@ -756,19 +758,19 @@ def find_capabilities_correlations(models=evaled_models,
 
 
 def main():
-    # v2_eval_runs_corrections()
-    # v2_eval_runs_analysis(save_figure=True)
+    v4_eval_runs_corrections()
+    v4_eval_runs_analysis(save_figure=True)
     # comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
     comparison_options = ['gscore']
-    # mode = 'all'
+    mode = 'all'
     # mode = [10, 11, 12, 13, 14]
-    for i in range(1, 15, 1):
+    for i in range(1, 2, 1):
         # mode = [j for j in range(1, i + 1, 1)]
         # mode = [i + j* for j in range(i, i + 1, 1)]
-        mode = [(i + j * 4) % 13 + 1 for j in range(3)]
+        # mode = [(i + j * 4) % 13 + 1 for j in range(3)]
         print('MODE:', mode)
         for opt in comparison_options:
-            find_capabilities_correlations(comparison_data=opt, mode=mode, pause=True)
+            find_capabilities_correlations(comparison_data=opt, mode=mode, pause=False)
         print('-' * 100)
 
 

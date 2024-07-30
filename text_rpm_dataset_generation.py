@@ -196,7 +196,7 @@ class RPMDataset:
                          min_configs_per_ruleset=2,
                          max_num_problems_per_num_rules=250,
                          custom_save_path=None,
-                         update_interval=1):
+                         update_interval=1000):
         if custom_save_path is not None and 'default_rpm_dataset_eval_problems_' not in custom_save_path:
             raise ValueError('If custom_save_path specified, it must incluce "default_rpm_dataset_eval_problems_".')
 
@@ -303,7 +303,7 @@ class RPMDataset:
         # # # # Save the final dataset and metadata
         path_base = 'default_rpm_dataset_eval_problems_' if custom_save_path is None or 'default_rpm_dataset_eval_problems_' not in custom_save_path else custom_save_path
         # path_id = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
-        path_id = 'ASDFJIKAJSDF'
+        path_id = 'NEW'
         save_path = path_base + path_id + '.jsonl'
 
         with open(save_path, 'w') as f:
@@ -319,7 +319,7 @@ class RPMDataset:
 
 def main():
     RPMDataset.generate_dataset(
-        max_num_rules=1,
+        max_num_rules=7,
         num_rows=5,
         num_cols=5
     )
