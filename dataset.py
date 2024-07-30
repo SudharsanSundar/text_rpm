@@ -26,7 +26,7 @@ DEFAULT_ATTRIBUTES = ('shape_type',
                       'inner_shape_texture',
                       'inner_shape_position',
                       'inner_shape_count')      # at 14 rn
-SUPPORTED_RULES = ('constant', 'progression', 'distribute_3')
+SUPPORTED_RULES = ('constant', 'progression', 'distribute_3', 'distribute_2', 'diagonals')
 DEFAULT_SAMPLING = {'base_num_exs': 10000,
                     '0_num_noncons_rules_prob': 0.1,
                     '1_num_noncons_rules_prob': 0.1,
@@ -185,8 +185,10 @@ class RPMDataset:
         self.len_dataset = total_num_problems
         self.save_dataset('default_rpm_dataset.json')
 
-    def generate_rule_combos(self, max_num_rules, idx, combo, all_combos):
-        if idx == max_num_rules:
+    def generate_rule_combos(self, max_num_rules, idx, combo, all_combos, max_searched=6**12):
+        if len(all_combos) > max_searched:
+            return
+        elif idx == max_num_rules:
             all_combos.append(combo)
         else:
             for rule in self.rules:

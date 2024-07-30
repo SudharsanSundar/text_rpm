@@ -9,7 +9,7 @@ Row 3: {row3}
 
 Please determine the correct values for the final tuple of Row 3, {mystery_tuple}, which completes the pattern.'''
 
-SUPPORTED_RULES = ['constant', 'progression', 'distribute_3']
+SUPPORTED_RULES = ['constant', 'progression', 'distribute_3', 'distribute_2', 'diagonals']
 SUPPORTED_NUM_UNIQUE_VALUES = 3
 
 
@@ -88,7 +88,7 @@ class RPMMaker:
         return attributes, final_grid_abstraction
 
     @staticmethod
-    def apply_rule_to_attribute(rule, order=None, sign=None):
+    def apply_rule_to_attribute(rule, order=None, sign=None, shift=None):
         if rule == 'constant':
             row_seeds = random.sample([i for i in range(3)], k=3) if order is None else order
             return [[row_seeds[i] for j in range(3)] for i in range(3)]
@@ -99,6 +99,27 @@ class RPMMaker:
             progression = random.sample([i for i in range(3)], k=3) if order is None else order
             sign = random.choice([-1, 1]) if sign is None else sign
             return [[progression[(j + sign * i) % 3] for j in range(3)] for i in range(3)]
+        elif rule == 'distribute_2':
+            progression = random.sample([i for i in range(3)], k=3) if order is None else order
+            sign = random.choice([-1, 1]) if sign is None else sign
+            shift = random.sample([i for i in range(3)], k=3) if shift is None else shift
+
+            chosen_cells = []
+            for i in range(3):
+                for j in range(3):
+                    if (sign * i + j - shift) % 3 == 0:
+                        chosen_cells.append([i, j])
+            
+            return [[progression[int([i, j] in chosen_cells)] for j in range(3)] for i in range(3)]
+        elif rule == 'diagonals':
+            progression = random.sample([i for i in range(3)], k=3) if order is None else order
+            sign = random.choice([-1, 1]) if sign is None else sign
+
+            temp = [[abs(abs(i - sign * j) + sign * 2) for j in range(3)] for i in range(3)]
+            if sign == -1:
+                return [[progression[temp[i][j]] for j in range(3)] for i in range(3)]
+            elif sign == 1:
+                return [[progression[abs(temp[i][j] - 2)] for j in range(3)] for i in range(3)]
         else:
             raise NotImplementedError(
                 f'Haven\'t designed the rule {rule} and implemented logic for it to use in a matrix.')
@@ -150,7 +171,7 @@ class RPMMaker:
         attributes = list(attribute_to_rule.keys())
         assert len(set(attributes)) == len(attributes)
 
-        total_num_unique = 6 ** len(attributes) * 2 ** sum(1 for attribute in attributes if attribute_to_rule[attribute] == 'distribute_3')     # Relies on the fact that there are only 3 unique values per attribute in the entire matrix
+        total_num_unique = 6 ** len(attributes) * 2 ** sum(1 for attribute in attributes if attribute_to_rule[attribute] in ['distribute_3', 'distribute_2', 'diagonals']) * 3 ** sum(1 for attribute in attributes if attribute_to_rule[attribute] in ['distribute_2'])     # Relies on the fact that there are only 3 unique values per attribute in the entire matrix
 
         all_abstractions = []
         rule_configs = RPMMaker.get_all_rule_configs(attributes, attribute_to_rule, max_num_rule_configs_tried)   # Relies on the fact that there are only 3 unique values per attribute
@@ -165,7 +186,8 @@ class RPMMaker:
                 rule_output = RPMMaker.apply_rule_to_attribute(
                     attribute_to_rule[attribute],
                     order=rule_config[attribute]['order'],
-                    sign=None if attribute_to_rule[attribute] != 'distribute_3' else rule_config[attribute]['sign']
+                    sign=None if attribute_to_rule[attribute] not in ['distribute_3', 'distribute_2', 'diagonals'] else rule_config[attribute]['sign'],
+                    shift=None if attribute_to_rule[attribute] not in ['distribute_2'] else rule_config[attribute]['shift']
                 )
 
                 rule_outputs[attribute] = rule_output
@@ -182,6 +204,7 @@ class RPMMaker:
     @staticmethod
     def get_all_rule_configs(attributes, attribute_to_rule, max_num_configs):
         all_configs = []
+        # shuffled_attributes = random.sample(attributes, k=len(attributes)) --> currently not properly randomized
 
         def compute_config_variations(attr_idx, config, configs):
             if len(configs) >= max_num_configs:
@@ -193,14 +216,14 @@ class RPMMaker:
                 order_permutations = list(itertools.permutations([i for i in range(3)]))
                 random.shuffle(order_permutations)
 
-                if attribute_to_rule[attributes[attr_idx]] != 'distribute_3':
+                if attribute_to_rule[attribute] in ['constant', 'progression']:
                     for order_permutation in order_permutations:
                         new_config = {} if config is None else config.copy()
                         new_config[attribute] = {}
                         new_config[attribute]['order'] = order_permutation
 
                         compute_config_variations(attr_idx + 1, new_config, configs)
-                elif attribute_to_rule[attributes[attr_idx]] == 'distribute_3':
+                elif attribute_to_rule[attribute] in ['distribute_3', 'diagonals']:
                     sign_permutations = [-1, 1]
                     for order_permutation in order_permutations:
                         for sign_permutation in sign_permutations:
@@ -210,6 +233,19 @@ class RPMMaker:
                             new_config[attribute]['sign'] = sign_permutation
 
                             compute_config_variations(attr_idx + 1, new_config, configs)
+                elif attribute_to_rule[attribute] in ['distribute_2']:
+                    sign_permutations = [-1, 1]
+                    shift_permutations = [0, 1, 2]
+                    for order_permutation in order_permutations:
+                        for sign_permutation in sign_permutations:
+                            for shift_permutation in shift_permutations:
+                                new_config = {} if config is None else config.copy()
+                                new_config[attribute] = {}
+                                new_config[attribute]['order'] = order_permutation
+                                new_config[attribute]['sign'] = sign_permutation
+                                new_config[attribute]['shift'] = shift_permutation
+
+                                compute_config_variations(attr_idx + 1, new_config, configs)
 
         compute_config_variations(0, None, all_configs)
 

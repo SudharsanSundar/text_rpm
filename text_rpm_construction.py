@@ -1,7 +1,6 @@
 import numpy as np
 from typing import List, Dict
 import pprint as ppr
-import random
 
 
 class RPMProblem:
@@ -74,9 +73,9 @@ class RPMProblem:
                 for k, attr_name in zip(range(self.num_attrs_per_cell), self.attr_names):
                     self.grid_struct[i][j][k].value = attr_to_values[attr_name][i][j]
                     self.grid[i][j][k] = self.attr_domains[attr_name][attr_to_values[attr_name][i][j]]
-        
-        ppr.pprint(self.grid)
-
+    
+    def get_grid(self):
+        return self.grid
 
 class RPMRule:
     '''
@@ -94,10 +93,25 @@ class RPMRule:
         self.num_rows = num_rows
         self.num_cols = num_cols
         self.attr_to_values = {attr_name: [[None for j in range(self.num_cols)] for i in range(self.num_rows)] for attr_name in self.attr_names}
+        print(self.attr_names)
     
     def apply_rule() -> Dict[str, List[List[int]]]:
         pass
+
+
+class RPMElement:
+    def __init__(self,
+                 attr_name: str,
+                 attr_domain: List[str],
+                 loc: List[int]) -> None:
+        assert len(attr_domain) > 0
+        assert len(loc) == 2 and type(loc[0]) == type(loc[1]) and type(loc[1]) == int
         
+        self.name = attr_name
+        self.domain = attr_domain
+        self.loc = loc
+        self.value = None
+
 
 class ConstantRowRule(RPMRule):
     '''
@@ -272,17 +286,27 @@ class Diagonals(RPMRule):
                 and (ordering['sign'] == -1 or ordering['sign'] == 1) \
                 and len(ordering.keys()) == 2
 
-        self.attr_to_values[self.attr_names[0]] = [[abs(abs(i - ordering['sign'] * j) + ordering['sign'] * 2) for j in range(self.num_cols)] for i in range(self.num_rows)]
-        print(self.attr_to_values[self.attr_names[0]])
-        print([[[abs(self.attr_to_values[self.attr_names[0]][i][j] - 2)] for j in range(self.num_cols)] for i in range(self.num_rows)])
+        self.attr_to_values[self.attr_names[0]] = [[abs(i + ordering['sign'] * j - int(ordering['sign'] == 1) * (self.num_cols - 1)) for j in range(self.num_cols)] for i in range(self.num_rows)]
         if ordering['sign'] == -1:
+            # self.attr_to_values[self.attr_names[0]] = [[abs(i - j) for j in range(self.num_cols)] for i in range(self.num_rows)]
             self.attr_to_values[self.attr_names[0]] = [[ordering['order'][self.attr_to_values[self.attr_names[0]][i][j]] for j in range(self.num_cols)] for i in range(self.num_rows)]
         elif ordering['sign'] == 1:
-            self.attr_to_values[self.attr_names[0]] = [[ordering['order'][abs(self.attr_to_values[self.attr_names[0]][i][j] - 2)] for j in range(self.num_cols)] for i in range(self.num_rows)]
+            # self.attr_to_values[self.attr_names[0]] = [[abs(i + j - self.num_cols + 1) for j in range(self.num_cols)] for i in range(self.num_rows)]
+            self.attr_to_values[self.attr_names[0]] = [[ordering['order'][self.attr_to_values[self.attr_names[0]][i][j]] for j in range(self.num_cols)] for i in range(self.num_rows)]
         
         return self.attr_to_values
 
 
+RULE_CONSTRUCTS = {
+    'constant_row': ConstantRowRule,
+    'constant_col': ConstantColRule,
+    'cycle_n': CycleN,
+    'cycle_n_minus_1': CycleNminus1,
+    'diagonals': Diagonals
+}
+
+
+'''
 # : Choose 3? // --> can be degenerate (ok ish?), and ordering is tough (num_cols! ^ num_rows) --> actually I don't like these rules for a variety of reasons
 
 # : Choose 2? // --> can also be degenerate --> also skip. Harder to implement, but also harder to be correct, and might be cool to try double attr rules instead
@@ -292,7 +316,7 @@ class Diagonals(RPMRule):
 # : Answers? Generation is harder, so a better task I think. But can't do distractions without answers. Keep this on backburner for now //
 
 # TODO: [some double attribute rule]
-'''
+
 must be intertwined somehow, otherwise you can just decompose it into each individual attr
 
 we can try some arithmetic type stuff, where things are encoded in binary!
@@ -316,69 +340,19 @@ Noise!
 '''
 
 
-class RPMElement:
-    def __init__(self,
-                 attr_name: str,
-                 attr_domain: List[str],
-                 loc: List[int]) -> None:
-        assert len(attr_domain) > 0
-        assert len(loc) == 2 and type(loc[0]) == type(loc[1]) and type(loc[1]) == int
-        
-        self.name = attr_name
-        self.domain = attr_domain
-        self.loc = loc
-        self.value = None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-RULE_CONSTRUCTS = {
-    'constant_row': ConstantRowRule,
-    'constant_col': ConstantColRule,
-    'cycle_n': CycleN,
-    'cycle_n_minus_1': CycleNminus1,
-    'diagonals': Diagonals
-}
-
-
 def main():
-    # test_problem = RPMProblem(
-    #     num_rows=3,
-    #     num_cols=3,
-    #     attr_names=['shape', 'color', 'texture'],
-    #     attr_domains={'shape': ['A', 'B', 'C'], 'color': ['A', 'B', 'C'], 'texture': ['A', 'B', 'C']},
-    #     rule_to_attr=[['constant_row', ['shape']], ['constant_col', ['color']], ['constant_row', ['texture']]],
-    #     rule_to_ordering=[['constant_row', {'order': [2, 1, 0]}], ['constant_col', {'order': [2, 1, 0]}], ['constant_row', {'order': [2, 1, 0]}]]
-    # )
-    print('-'*100)
+    print('~'*100)
     test_problem = RPMProblem(
-        num_rows=3,
-        num_cols=3,
+        num_rows=5,
+        num_cols=5,
         attr_names=['shape', 'color', 'texture'],
-        attr_domains={'shape': ['A', 'B', 'C'], 'color': ['A', 'B', 'C'], 'texture': ['A', 'B', 'C']},
-        rule_to_attr=[['constant_row', ['shape']], ['constant_row', ['color']], ['diagonals', ['texture']]],
-        rule_to_ordering=[['constant_row', {'order': [0, 1, 2]}], ['constant_row', {'order': [0, 1, 2]}], ['diagonals', {'order': [0, 1, 2], 'sign': 1}]]
+        attr_domains={'shape': ['A', 'B', 'C', 'D', 'E'], 'color': ['A', 'B', 'C', 'D', 'E'], 'texture': ['A', 'B', 'C', 'D', 'E']},
+        rule_to_attr=[['constant_row', ['shape']], ['constant_col', ['color']], ['diagonals', ['texture']]],
+        rule_to_ordering=[['constant_row', {'order': [0, 1, 2, 3, 4]}], ['constant_col', {'order': [0, 1, 2, 3, 4]}], ['diagonals', {'order': [0, 1, 2, 3, 4], 'sign': 1}]]
     )
+    print('-'*100)
+    for row in test_problem.grid:
+        print(row)
 
 
 if __name__ == '__main__':
