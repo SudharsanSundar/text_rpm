@@ -39,8 +39,22 @@ evaled_model_fps = [
     "gpt-4o-mini",
     "google/gemma-2-27b-it"
 ]
-
 evaled_models = [fp.split('/')[-1] for fp in evaled_model_fps]
+
+evaled_model_fps2 = [
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct" ,
+    "/data/public_models/huggingface/meta-llama/Llama-2-13b-chat-hf",
+    "/data/public_models/huggingface/meta-llama/Llama-2-7b-chat-hf",
+    "/data/public_models/huggingface/Qwen/Qwen1.5-0.5B-Chat", 
+    "/data/public_models/huggingface/Qwen/Qwen1.5-1.8B-Chat", 
+    "/data/public_models/huggingface/Qwen/Qwen1.5-4B-Chat", 
+    "/data/public_models/huggingface/tiiuae/falcon-7b-instruct",
+    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-7b-chat",
+    "/data/public_models/huggingface/google/gemma-1.1-2b-it", 
+    "/data/public_models/huggingface/google/gemma-1.1-7b-it", 
+    "/data/public_models/huggingface/01-ai/Yi-6B-Chat", 
+]
+evaled_models2 = [fp.split('/')[-1] for fp in evaled_model_fps2]
 
 model_to_param_count = {
   "Meta-Llama-3-70B-Instruct": "70B",
@@ -339,16 +353,17 @@ model_to_values = {
     "gpt-4o-mini": {},
     "gemma-2-27b-it": {}
 }
-print(set(model_to_param_count.keys()) - set(model_to_values.keys()))
+# print(set(model_to_param_count.keys()) - set(model_to_values.keys()))
 for key in model_to_param_count.keys():
     model_to_values[key]['num_params'] = model_to_param_count[key]
     model_to_values[key]['tokens_seen'] = model_to_tokens_seen.get(key, None)    
     model_to_values[key]['gscore'] = model_to_gscore.get(key, None)
 
-ppr.pprint(set.intersection(set(list(model_to_gscore.keys())), set(list(model_to_param_count.keys()))))
+# ppr.pprint(set.intersection(set(list(model_to_gscore.keys())), set(list(model_to_param_count.keys()))))
 
 
-def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False):
+
+def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False, old_format=False):
     '''
     Analyze how models perform on various subsets of the text RPM eval results
     '''
@@ -360,7 +375,9 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
         score_breakdown_results = {
             'total_num_rules': {},
             'num_nonconstant_rules': {},
-            'num_distribute_3_rules': {},
+            'num_cycle_n_rules': {},
+            'num_cycle_n_minus_1_rules': {},
+            'num_diagonals_rules': {},
             'num_unique_rules': {},
             'edit_distance': {},
             'num_unparsable_answers': 0,
@@ -371,43 +388,44 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
         total_in_category = {
             'total_num_rules': {},
             'num_nonconstant_rules': {},
-            'num_distribute_3_rules': {},
+            'num_cycle_n_rules': {},
+            'num_cycle_n_minus_1_rules': {},
+            'num_diagonals_rules': {},
             'num_unique_rules': {},
             'edit_distance': {}
         }
 
         for result in results:
-            num_rules = len(result['problem_characteristics']['attribute_to_rule'].values())
-            num_nonconstant_rules = len(
-                [rule for rule in result['problem_characteristics']['attribute_to_rule'].values() if
-                 rule != 'constant'])
-            num_distribute_3_rules = len(
-                [rule for rule in result['problem_characteristics']['attribute_to_rule'].values() if
-                 rule == 'distribute_3'])
-            num_unique_rules = len(set(result['problem_characteristics']['attribute_to_rule'].values()))
+            # NOTE: Changed away from v2 formatting (old_formate) to v4 formatting
+            if old_format:
+                num_rules = len(result['problem_characteristics']['attribute_to_rule'].values())
+                num_nonconstant_rules = len([rule for rule in result['problem_characteristics']['attribute_to_rule'].values() if rule != 'constant'])
+                num_cycle_n_rules = len([rule for rule in result['problem_characteristics']['attribute_to_rule'].values() if rule == 'distribute_3'])
+                num_unique_rules = len(set(result['problem_characteristics']['attribute_to_rule'].values()))
+                num_cycle_n_minus_1_rules = 0
+                num_diagonals_rules = 0
+            else:
+                num_rules = len(result['problem_characteristics']['rule_to_attribute'])
+                num_nonconstant_rules = len([pair[0] for pair in result['problem_characteristics']['rule_to_attribute'] if pair[0] not in ['constant_row', 'constant_col']])
+                num_cycle_n_rules = len([pair[0] for pair in result['problem_characteristics']['rule_to_attribute'] if pair[0] == 'cycle_n'])
+                num_cycle_n_minus_1_rules = len([pair[0] for pair in result['problem_characteristics']['rule_to_attribute'] if pair[0] == 'cycle_n_minus_1'])
+                num_diagonals_rules = len([pair[0] for pair in result['problem_characteristics']['rule_to_attribute'] if pair[0] == 'diagonals'])
+                num_unique_rules = len(set([pair[0] for pair in result['problem_characteristics']['rule_to_attribute']]))
 
             total_in_category['total_num_rules'][num_rules] = total_in_category['total_num_rules'].get(num_rules, 0) + 1
-            total_in_category['num_nonconstant_rules'][num_nonconstant_rules] = total_in_category[
-                                                                                    'num_nonconstant_rules'].get(
-                num_nonconstant_rules, 0) + 1
-            total_in_category['num_distribute_3_rules'][num_nonconstant_rules] = total_in_category[
-                                                                                     'num_distribute_3_rules'].get(
-                num_distribute_3_rules, 0) + 1
-            total_in_category['num_unique_rules'][num_unique_rules] = total_in_category['num_unique_rules'].get(
-                num_unique_rules, 0) + 1
+            total_in_category['num_nonconstant_rules'][num_nonconstant_rules] = total_in_category['num_nonconstant_rules'].get(num_nonconstant_rules, 0) + 1
+            total_in_category['num_cycle_n_rules'][num_nonconstant_rules] = total_in_category['num_cycle_n_rules'].get(num_cycle_n_rules, 0) + 1
+            total_in_category['num_cycle_n_minus_1_rules'][num_nonconstant_rules] = total_in_category['num_cycle_n_minus_1_rules'].get(num_cycle_n_minus_1_rules, 0) + 1
+            total_in_category['num_diagonals_rules'][num_nonconstant_rules] = total_in_category['num_diagonals_rules'].get(num_diagonals_rules, 0) + 1
+            total_in_category['num_unique_rules'][num_unique_rules] = total_in_category['num_unique_rules'].get(num_unique_rules, 0) + 1
             total_in_category['edit_distance'][num_rules] = total_in_category['edit_distance'].get(num_rules, 0) + len(result['correct_answer'])
 
-            score_breakdown_results['total_num_rules'][num_rules] = score_breakdown_results['total_num_rules'].get(
-                num_rules, 0) + result['score']
-            score_breakdown_results['num_nonconstant_rules'][num_nonconstant_rules] = score_breakdown_results[
-                                                                                          'num_nonconstant_rules'].get(
-                num_nonconstant_rules, 0) + result['score']
-            score_breakdown_results['num_distribute_3_rules'][num_nonconstant_rules] = score_breakdown_results[     # TODO: something is wrong here. everything is num noncons 0
-                                                                                           'num_distribute_3_rules'].get(
-                num_distribute_3_rules, 0) + result['score']
-            score_breakdown_results['num_unique_rules'][num_unique_rules] = score_breakdown_results[
-                                                                                'num_unique_rules'].get(
-                num_unique_rules, 0) + result['score']
+            score_breakdown_results['total_num_rules'][num_rules] = score_breakdown_results['total_num_rules'].get(num_rules, 0) + result['score']
+            score_breakdown_results['num_nonconstant_rules'][num_nonconstant_rules] = score_breakdown_results['num_nonconstant_rules'].get(num_nonconstant_rules, 0) + result['score']
+            score_breakdown_results['num_cycle_n_rules'][num_nonconstant_rules] = score_breakdown_results['num_cycle_n_rules'].get(num_cycle_n_rules, 0) + result['score']
+            score_breakdown_results['num_cycle_n_minus_1_rules'][num_nonconstant_rules] = score_breakdown_results['num_cycle_n_minus_1_rules'].get(num_cycle_n_minus_1_rules, 0) + result['score']
+            score_breakdown_results['num_diagonals_rules'][num_nonconstant_rules] = score_breakdown_results['num_diagonals_rules'].get(num_diagonals_rules, 0) + result['score']
+            score_breakdown_results['num_unique_rules'][num_unique_rules] = score_breakdown_results['num_unique_rules'].get(num_unique_rules, 0) + result['score']
             score_breakdown_results['edit_distance'][num_rules] = score_breakdown_results['edit_distance'].get(num_rules, 0) + len(result['correct_answer']) if len(result['extracted_answer']) == 0 else score_breakdown_results['edit_distance'].get(num_rules, 0) + min(edit_distance(result['extracted_answer'], result['correct_answer']), len(result['extracted_answer']) * 2)      # TODO: hacky cap of edit distance to 2x correct answer len
 
             extracted_answer = result['extracted_answer']
@@ -430,8 +448,8 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
                 score_breakdown_results['num_formatted_but_improper_answer'] += 1
 
     score_breakdown_results['overall_accuracy'] = sum(
-        score_breakdown_results['total_num_rules'][num_rules] for num_rules in
-        score_breakdown_results['total_num_rules']) / len(results)
+        score_breakdown_results['total_num_rules'][num_rules] for num_rules in score_breakdown_results['total_num_rules']
+    ) / len(results)
     fraction_correct = {
         category: {num: score_breakdown_results[category][num] / total_in_category[category][num] for num in
                    total_in_category[category]} for category in total_in_category}
@@ -461,9 +479,16 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
     with open(save_fp + '.json', 'w') as f:
         json.dump(score_breakdown_results, f, indent=4)
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 5))
-    del fraction_correct['num_nonconstant_rules']
-    del fraction_correct['num_distribute_3_rules']
+    dont_graph = [
+        'num_nonconstant_rules',
+        'num_cycle_n_rules',
+        'num_cycle_n_minus_1_rules',
+        'num_diagonals_rules',
+    ]
+    for key in dont_graph:
+        del fraction_correct[key]
+    
+    fig, axes = plt.subplots(len(fraction_correct), 1, figsize=(12, 12))
 
     for i, category in enumerate(fraction_correct):
         ax = axes[i] # axes[i // 2, i % 2]
@@ -472,7 +497,7 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
 
         bars = ax.bar(keys, values, color='skyblue')
         ax.set_xlabel(' '.join(category.split('_')))
-        ax.set_ylabel('Fraction of problems correct')
+        ax.set_ylabel('Fraction correct' if category != 'edit_distance' else 'Fraction wrong')
         ax.set_title(category)
 
         for bar, key in zip(bars, keys):
@@ -667,7 +692,7 @@ def reparse_answers(eval_results_fp, model_name, overwrite=False, save_path=None
                 f.write(json.dumps(result) + '\n')
 
 
-def v4_eval_runs_corrections(results_folder='./v4_results/', save_folder='./v4_results_cleaned/', results_file_prefix='rpm_eval_results_'):
+def eval_runs_corrections(results_folder='./v4_results/', save_folder='./v4_results_cleaned/', results_file_prefix='rpm_eval_results_'):
     '''
     Run answer reparsing on all eval results, and save to different dir
     '''
@@ -682,10 +707,11 @@ def v4_eval_runs_corrections(results_folder='./v4_results/', save_folder='./v4_r
         )
 
 
-def v4_eval_runs_analysis(results_folder='./v4_results_cleaned/', 
-                          save_folder='./v4_results_analysis/', 
-                          results_file_prefix='rpm_eval_results2_', 
-                          save_figure=False):
+def eval_runs_analysis(results_folder='./v4_results_cleaned/', 
+                       save_folder='./v4_results_analysis/', 
+                       results_file_prefix='rpm_eval_results2_', 
+                       save_figure=False,
+                       old_format=False):
     '''
     Run score breakdown for all eval results
     '''
@@ -694,7 +720,7 @@ def v4_eval_runs_analysis(results_folder='./v4_results_cleaned/',
     for fp in all_results_files:
         if True:
             model_name = fp[len(results_folder + results_file_prefix):-len('.json')]
-            score_breakdown(eval_results_fp=fp, model_name=model_name, save_folder=save_folder, save_figure=save_figure)
+            score_breakdown(eval_results_fp=fp, model_name=model_name, save_folder=save_folder, save_figure=save_figure, old_format=old_format)
 
 
 def find_capabilities_correlations(models=evaled_models, 
@@ -710,6 +736,7 @@ def find_capabilities_correlations(models=evaled_models,
     for model in models:
         with open(analysis_fp.format(model_name=model), 'r') as f:
             results = json.load(f)
+            print(model)
             if mode == 'all':
                 model_to_textrpm_acc[model] = results['overall_accuracy']
             else:
@@ -758,20 +785,52 @@ def find_capabilities_correlations(models=evaled_models,
 
 
 def main():
-    v4_eval_runs_corrections()
-    v4_eval_runs_analysis(save_figure=True)
-    # comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
-    comparison_options = ['gscore']
-    mode = 'all'
-    # mode = [10, 11, 12, 13, 14]
-    for i in range(1, 2, 1):
-        # mode = [j for j in range(1, i + 1, 1)]
-        # mode = [i + j* for j in range(i, i + 1, 1)]
-        # mode = [(i + j * 4) % 13 + 1 for j in range(3)]
-        print('MODE:', mode)
-        for opt in comparison_options:
-            find_capabilities_correlations(comparison_data=opt, mode=mode, pause=False)
-        print('-' * 100)
+    versions = [
+        'v2',
+        'v4',
+    ]
+    do_cleaning = False
+    do_analysis = False
+
+    for version in versions:
+        results_folder = './{v}_results/'.format(v=version)
+        cleaned_results_folder = './{v}_results_cleaned/'.format(v=version)
+        analysis_save_folder = './{v}_results_analysis/'.format(v=version)
+        capabilities_analysis_save_folder = './{v}_capabilities_comparisons/'.format(v=version)
+
+        if do_cleaning:
+            eval_runs_corrections(
+                results_folder=results_folder, 
+                save_folder=cleaned_results_folder, 
+                results_file_prefix='rpm_eval_results_'
+            )
+        if do_analysis:
+            eval_runs_analysis(
+                results_folder=cleaned_results_folder, 
+                save_folder=analysis_save_folder, 
+                results_file_prefix='rpm_eval_results2_', 
+                save_figure=True,
+                old_format=(version == 'v2')
+            )
+        
+        # comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
+        comparison_options = ['gscore']
+        # mode = 'all' # [10, 11, 12, 13, 14]
+        mode = [1, 2, 3, 4, 5, 6]
+        for i in range(1, 2, 1):
+            # mode = [j for j in range(1, i + 1, 1)]
+            # mode = [i + j* for j in range(i, i + 1, 1)]
+            # mode = [(i + j * 4) % 13 + 1 for j in range(3)]
+
+            print('MODE:', mode)
+            for opt in comparison_options:
+                find_capabilities_correlations(models=evaled_models2, 
+                                            analysis_fp=analysis_save_folder + 'rpm_eval_analysis-{model_name}.json',
+                                            mode=mode,
+                                            comparison_data=opt,
+                                            save_folder=capabilities_analysis_save_folder,
+                                            pause=False)
+            print('-' * 100)
 
 
 if __name__ == '__main__':

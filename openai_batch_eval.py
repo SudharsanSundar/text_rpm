@@ -1,6 +1,7 @@
 import openai
 import json
 import pprint as ppr
+import re
 
 client = openai.OpenAI()
 
@@ -133,11 +134,10 @@ def retrieve_and_save_job_result(eval_problems_fp, output_file_id, save_fp):
 
 def main():
     # Reference pg: https://platform.openai.com/docs/guides/batch/getting-started
-    eval_problems_fp = './datasets/default_rpm_dataset_eval_problems_v2.json'
-    batch_fp = './datasets/default_rpm_dataset_eval_problems_v2_oai_batch.jsonl'
-    output_file_id = 'file-fmCLFblBKykGMBm9HXrHWnBh'
-    output_save_fp = './v2_results/rpm_eval_results_gpt-4o-mini.json'
+    eval_problems_fp = './datasets/default_rpm_dataset_eval_problems_5x5.jsonl'
+    # eval_problems_fp = './datasets/default_rpm_dataset_eval_problems_v4.jsonl'
 
+    # batch_fp = './datasets/default_rpm_dataset_eval_problems_5x5_oai_batch.jsonl'
     # generate_oai_batch_eval_file(
     #     eval_problems_fp=eval_problems_fp,
     #     save_fp=batch_fp
@@ -147,7 +147,10 @@ def main():
 
     # check_on_batch_jobs()
 
-    # retrieve_and_save_job_result(eval_problems_fp, output_file_id, output_save_fp)
+    output_file_id = 'file-ldwWBCBbxZrUUiSPKeYJNMjE'        # 5x5
+    # output_file_id = 'file-wwJmtSaSrRCQAFIrKgBC9bXA'        # 3x3
+    output_save_fp = './v4_results/rpm_eval_results_gpt-4o-mini.json'
+    retrieve_and_save_job_result(eval_problems_fp, output_file_id, output_save_fp)
 
 
 if __name__ == '__main__':
