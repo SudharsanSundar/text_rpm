@@ -6,20 +6,29 @@ from itertools import chain
 import numpy as np
 import random
 
-program_template = '''n = num_rows
-l = num_cols
-a_len = len(A)
-walker = Walker(ordered_alphabet=A, num_rows=n, num_cols=l)
+'''
+generative options
 
-for instance in range(n):
-    state = {state_program}
-    walker.pos = {walker_start_program}
-    
-    for time_step in range(l):
-        {inner_loop_program}
-        
-        print(walker.print())'''
+RPM
+1. cycle len == num cols
+2. cycle len == num rows + 2 or + 1
 
+Number sequences
+1. Path x Path x Path
+Have a pattern occuring over certain indices that are layered. 
+E.g. one pattern happening on all indices, one happening on even indices, one happening on every 3rd index, etc.
+E.g.
+1001 -> 01112 (every idx, except when other pattern goes) x 11 (every idx after end of other pattern) = 011123444567778???
+
+2. Deep cumulative sums
+010101 0 -> can decide how long a base pattern we want, e.g. 0-0-0-... or 1-1-1-... is 1, 01-01-... is 2, 101-101-101-... is 3, etc., and we can eliminate prefixes
+011223 3
+012469 12
+0137 13 21 33 ^ can layer as deep as we want to increase complexity
+etc.
+
+
+'''
 
 
 # Templates
@@ -110,12 +119,19 @@ The final mask is the composition of these masks, hence:
 '''
 
 
+program_template = '''n = num_rows
+l = num_cols
+a_len = len(A)
+walker = Walker(ordered_alphabet=A, num_rows=n, num_cols=l)
 
-
-
-
-
-
+for instance in range(n):
+    state = {state_program}
+    walker.pos = {walker_start_program}
+    
+    for time_step in range(l):
+        {inner_loop_program}
+        
+        print(walker.print())'''
 
 
 class Walker:
@@ -269,11 +285,11 @@ class MaskRule(RuleParam):
 
         self.state_mask = state_mask
         self.inner_loop_program = f'''
-if state in {[i for i in range(0, a_len, int((a_len + 1) / len(actions)))]}:
+if state % {len(actions)} == 0:
     {actions[0]}
 '''
         for i, action in enumerate(actions[1:]):
-            self.inner_loop_program += f'''elif state in {[j + i + 1 for j in range(0, a_len - i, int((a_len + 1) / len(actions)))]}:
+            self.inner_loop_program += f'''elif state % {len(actions)} == {i + 1}:
     {action}
 '''
 
@@ -382,6 +398,7 @@ def generate_grid(num_rows: int,
     walker = Walker(ordered_alphabet=A, num_rows=n, num_cols=l)
 
     for instance in range(n):
+        # TODO: Account for state properly. Current implementation misses the last state value of each row (p sure, check)
         state = evaluate_state_program(state_program, instance, n, l, A) if state_mask is None else state_mask[instance][0]
         walker.pos = evaluate_walker_start_program(walker_start_program, instance, n, l, A, state)
         

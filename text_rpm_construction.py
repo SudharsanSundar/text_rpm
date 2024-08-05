@@ -1,81 +1,22 @@
 import numpy as np
-from typing import List, Dict
+from typing import Any, List, Dict
 import pprint as ppr
 
+SUPPORTED_RULE_TYPES = ['dependent', 'independent']
 
-class RPMProblem:
-    '''
-    Class representing a single Text RPM problem.
-    '''
-    def __init__(self, 
-                 num_rows: int, 
-                 num_cols: int, 
-                 attr_names: List[str],
-                 attr_domains: Dict[str, List[str]],
-                 rule_to_attr: List[str | List[str]],
-                 mapping_type: str='random',
-                 rule_to_ordering: List[List[str | Dict[str, List[int]]]]=None) -> None:
-        # Make sure problem parameters are valid
-        assert num_rows > 1
-        assert num_cols > 1
-        assert len(attr_names) > 0
 
-        self.num_rows = num_rows
-        self.num_cols = num_cols
-        self.num_attrs_per_cell = len(attr_names)
-        self.attr_names = attr_names
-        self.attr_domains = attr_domains
-        self.rule_to_attr = rule_to_attr
-        self.rule_to_ordering = rule_to_ordering
-
-        # Create RPM grids, one which holds an abstracted version of the problem, and one which holds a literal instance of the problem
-        self.grid_struct = [
-            [
-                [
-                    RPMElement(attr_name=attr_name, attr_domain=self.attr_domains[attr_name], loc=[i, j]) for attr_name in self.attr_names
-                ] for j in range(self.num_cols)
-            ] for i in range(self.num_rows)
-        ]
-        self.grid = [
-            [
-                [
-                    None for k in range(self.num_attrs_per_cell)
-                ] for j in range(self.num_cols)
-            ] for i in range(self.num_rows)
-        ]
-
-        # Check to make sure rule assignments are valid, then fetch all rule classes used for this problem
-        attrs_from_rules = []
-        for pair in self.rule_to_attr:
-            attrs_from_rules.append(*pair[1])
-        assert all(pair[0] in RULE_CONSTRUCTS for pair in self.rule_to_attr)
-        assert all(attr in self.attr_names for attr in attrs_from_rules) and all(attr in attrs_from_rules for attr in self.attr_names)
-        assert len(set(attrs_from_rules)) == len(attrs_from_rules)
-
-        self.rules = [RULE_CONSTRUCTS[pair[0]](pair[1], pair[0], self.num_rows, self.num_cols) for pair in self.rule_to_attr]
+class RPMElement:
+    def __init__(self,
+                 attr_name: str,
+                 attr_domain: List[str],
+                 loc: List[int]) -> None:
+        assert len(attr_domain) > 0
+        assert len(loc) == 2 and type(loc[0]) == type(loc[1]) and type(loc[1]) == int
         
-        # Calculate and organize value assignments to each attribute based on rules, including remapping to different indices if desired
-        assert self.rule_to_ordering is None or (
-            all(pair[0] in [pair2[0] for pair2 in self.rule_to_attr] for pair in self.rule_to_ordering) and 
-            all(pair2[0] in [pair[0] for pair in self.rule_to_ordering] for pair2 in self.rule_to_attr) and 
-            all(pair[0] == pair2[0] for pair, pair2 in zip(self.rule_to_attr, rule_to_ordering))
-        )
-        attr_to_values = {}
-        for i, rule in enumerate(self.rules):
-            rule_output = rule.apply_rule(ordering=self.rule_to_ordering[i][1] if self.rule_to_ordering is not None else self.rule_to_ordering)
-
-            for attr in rule_output:
-                attr_to_values[attr] = rule_output[attr]
-        
-        # Assign RPM grid elements their values based on the given rules
-        for i in range(self.num_rows):
-            for j in range(self.num_cols):
-                for k, attr_name in zip(range(self.num_attrs_per_cell), self.attr_names):
-                    self.grid_struct[i][j][k].value = attr_to_values[attr_name][i][j]
-                    self.grid[i][j][k] = self.attr_domains[attr_name][attr_to_values[attr_name][i][j]]
-    
-    def get_grid(self):
-        return self.grid
+        self.name = attr_name
+        self.domain = attr_domain
+        self.loc = loc
+        self.value = None
 
 
 class RPMRule:
@@ -97,20 +38,6 @@ class RPMRule:
     
     def apply_rule() -> Dict[str, List[List[int]]]:
         pass
-
-
-class RPMElement:
-    def __init__(self,
-                 attr_name: str,
-                 attr_domain: List[str],
-                 loc: List[int]) -> None:
-        assert len(attr_domain) > 0
-        assert len(loc) == 2 and type(loc[0]) == type(loc[1]) and type(loc[1]) == int
-        
-        self.name = attr_name
-        self.domain = attr_domain
-        self.loc = loc
-        self.value = None
 
 
 class ConstantRowRule(RPMRule):
@@ -297,47 +224,247 @@ class Diagonals(RPMRule):
         return self.attr_to_values
 
 
-RULE_CONSTRUCTS = {
+# TODO: All of these can be solved by just choosing the missing number
+class GeneralCycle(RPMRule):
+    def __init__(self, 
+                 attr_names: List[str] | None, 
+                 rule_name: str, 
+                 num_rows: int, 
+                 num_cols: int,
+                 path: List[int]) -> None:
+        if attr_names is None:
+            attr_names = [None] * num_cols
+        super().__init__(attr_names, rule_name, num_rows, num_cols)
+
+        self.path = path
+    
+    def __call__(self, attr_names, rule_name, num_rows, num_cols) -> Any:
+        return GeneralCycle(attr_names, rule_name, num_rows, num_cols, path=self.path)
+
+    def apply_rule(self, ordering) -> Dict[str, List[List[int]]]:
+        if ordering is None:
+            ordering = {'order': range(self.num_cols), 'row_starts': range(self.num_rows)}
+        else:
+            assert 'order' in ordering \
+                and type(ordering['order']) == list \
+                and all(type(elem) == int for elem in ordering['order']) \
+                and len(ordering['order']) == self.num_cols \
+                and 'row_starts' in ordering \
+                and type(ordering['row_starts']) == list \
+                and all(type(elem) == int for elem in ordering['row_starts']) \
+                and len(ordering.keys()) == 2
+        
+        row_starts = ordering['row_starts']
+        grid = []
+        for row_start in row_starts:
+            grid.append([ordering['order'][(row_start + path_pos) % self.num_cols] for path_pos in self.path])
+        
+        self.attr_to_values[self.attr_names[0]] = grid
+        return self.attr_to_values
+
+
+def generate_all_cycle_rules(attr_names=None, n=5, l=5):
+    def generate_paths(lim_n, it, path):
+        if it == lim_n:
+            all_paths.append(path)
+        else:
+            for elem in [-1, 0, 1]:
+                generate_paths(lim_n, it + 1, path + [elem])
+
+    all_paths = []
+    generate_paths(l - 1, 0, [0])
+    absolute_paths = [list(np.cumsum(item)) for item in all_paths]
+
+    general_cycle_rules = {}
+    for i, path in enumerate(absolute_paths):
+        general_cycle_rules[f'general_cycle_{i}'] = GeneralCycle(
+            attr_names=attr_names, 
+            rule_name=f'general_cycle_{i}', 
+            num_rows=n, 
+            num_cols=l,
+            path=path
+        )
+    
+    return general_cycle_rules
+
+
+class MappingOperation:
+    def __init__(self, num_rows: int, num_cols: int, operation: Any=lambda x, y: int(x == y), func_type: str='lambda') -> None:
+        self.func_type = func_type
+        self.operation = operation
+
+    def __call__(self, args: List[int]) -> Any:
+        if self.func_type == 'lambda':
+            return self.operation(*args)
+        elif self.func_type == 'lookup':
+            return self.operation(tuple(args))
+
+
+class NaryRule(RPMRule):
+    def __init__(self, 
+                 attr_names: List[str] | None, 
+                 rule_name: str, 
+                 num_rows: int, 
+                 num_cols: int,
+                 mapping: MappingOperation) -> None:
+        if attr_names is None:
+            attr_names = [None] * num_cols
+        super().__init__(attr_names, rule_name, num_rows, num_cols)
+        self.mapping = mapping
+    
+    def __call__(self, 
+                 attr_names: List[str], 
+                 rule_name: str, 
+                 num_rows: int, 
+                 num_cols: int) -> Any:
+        return NaryRule(attr_names, rule_name, num_rows, num_cols, mapping=self.mapping)
+    
+    def apply_rule(self, input_grids, ordering=None) -> Dict[str, List[List[int]]]:
+        assert ordering is None
+
+        new_grid = []
+        for i in range(self.num_rows):
+            new_row = []
+            for j in range(self.num_cols):
+                new_row.append(self.mapping([int(grid[i][j]) for grid in input_grids]))
+            
+            new_grid.append(new_row)
+        
+        self.attr_to_values[self.attr_names[-1]] = new_grid
+
+        return self.attr_to_values
+
+
+def generate_nary_rules(attr_names=None, n=5, l=5, a_len=5, nary=2, b_len=3):
+    # # Complex: Computing all possible mappings of the input domain to all subsets of the output domain
+    # def compute_input_domain(idx, input_tuple):
+    #     if idx == nary:
+    #         domain.append(input_tuple)
+    #     else:
+    #         for i in range(a_len):
+    #             compute_input_domain(idx + 1, input_tuple + [i])
+    
+    # domain = []
+    # compute_input_domain(0, [])
+    # domain = [tuple(elem) for elem in domain]
+    
+    # operations = None # TODO: Generate all mappings to outputs
+
+    # # Simple: Only basic logic-based binary mappings to binary or ternary alphabet
+    assert nary == 2
+    assert b_len == 3
+    mid = int(a_len / 2)
+    operations = [
+        lambda x, y: int(x == y), # 01
+        lambda x, y: int(x != y),
+        lambda x, y: x >= y,
+        lambda x, y: x <= y,
+        lambda x, y: int(x >= mid) + int(y >= mid), #012
+        lambda x, y: x >= mid and y >= mid, #01
+        lambda x, y: x <= mid and y <= mid,
+        lambda x, y: (x >= mid and y <= mid) or (x <= mid and y >= mid),
+        lambda x, y: x >= mid or y >= mid,
+        lambda x, y: x <= mid or y <= mid,
+    ]
+
+    nary_structs = {f'nary_{i}': NaryRule(None, f'nary_{i}', n, l, MappingOperation(n, l, operation)) for i, operation in enumerate(operations)}
+
+    return nary_structs
+
+
+DEFAULT_RULE_CONSTRUCTS = {
     'constant_row': ConstantRowRule,
     'constant_col': ConstantColRule,
     'cycle_n': CycleN,
     'cycle_n_minus_1': CycleNminus1,
-    'diagonals': Diagonals
+    'diagonals': Diagonals,
+    'general_cycle': GeneralCycle
 }
 
 
-'''
-# : Choose 3? // --> can be degenerate (ok ish?), and ordering is tough (num_cols! ^ num_rows) --> actually I don't like these rules for a variety of reasons
+class RPMProblem:
+    '''
+    Class representing a single Text RPM problem.
+    '''
+    def __init__(self, 
+                 num_rows: int, 
+                 num_cols: int, 
+                 attr_names: List[str],
+                 attr_domains: Dict[str, List[str]],
+                 rule_to_attr: List[str | List[str]],
+                 rule_maps: List[str | List[int | None]],
+                 rule_to_ordering: List[List[str | Dict[str, List[int]]]]=None,
+                 rule_constructs: Dict[str, RPMRule]=DEFAULT_RULE_CONSTRUCTS,
+                 ) -> None:
+        # Make sure problem parameters are valid
+        assert num_rows > 1
+        assert num_cols > 1
+        assert len(attr_names) > 0
 
-# : Choose 2? // --> can also be degenerate --> also skip. Harder to implement, but also harder to be correct, and might be cool to try double attr rules instead
+        self.num_rows = num_rows
+        self.num_cols = num_cols
+        self.num_attrs_per_cell = len(attr_names)
+        self.attr_names = attr_names
+        self.attr_domains = attr_domains
+        self.rule_to_attr = rule_to_attr
+        self.rule_to_ordering = rule_to_ordering
+        self.rule_maps = rule_maps
 
-# : Distractions? --> seems tough to do without screwing up determination  //
+        # Create RPM grid which holds a literal instance of the problem
+        self.grid = [
+            [
+                [
+                    None for k in range(self.num_attrs_per_cell)
+                ] for j in range(self.num_cols)
+            ] for i in range(self.num_rows)
+        ]
 
-# : Answers? Generation is harder, so a better task I think. But can't do distractions without answers. Keep this on backburner for now //
+        # Check to make sure rule assignments are valid, then fetch all rule classes used for this problem
+        attrs_from_rules = []
+        for pair in self.rule_to_attr:
+            attrs_from_rules.append(*pair[1])
+        assert all(pair[0] in rule_constructs for pair in self.rule_to_attr)
+        assert all(attr in self.attr_names for attr in attrs_from_rules) and all(attr in attrs_from_rules for attr in self.attr_names)
+        assert len(set(attrs_from_rules)) == len(attrs_from_rules)
 
-# TODO: [some double attribute rule]
+        self.rules = [rule_constructs[pair[0]](pair[1], pair[0], self.num_rows, self.num_cols) for pair in self.rule_to_attr]
+        
+        # Calculate and organize value assignments to each attribute based on rules, including remapping to different indices if desired
+        assert all(
+            pair1[0] == pair2[0] for pair1, pair2 in zip(rule_maps, self.rule_to_attr)
+            ) and all(
+            type(pair[1]) == list and (all(type(elem) == int for elem in pair[1]) or len(pair[1]) == 0) for pair in rule_maps
+        )
+        assert self.rule_to_ordering is None or ( # TODO: Debug issue here
+            all(pair[0] in [pair2[0] for pair2 in self.rule_to_attr] for pair in self.rule_to_ordering) and 
+            all(pair2[0] in [pair[0] for pair in self.rule_to_ordering] for pair2 in self.rule_to_attr) and 
+            all(pair[0] == pair2[0] for pair, pair2 in zip(self.rule_to_attr, rule_to_ordering))
+        )
+        
+        attr_to_values = {}
+        for i, rule in enumerate(self.rules):
+            if len(rule_maps[i][1]) == 0:
+                rule_output = rule.apply_rule(ordering=self.rule_to_ordering[i][1] if self.rule_to_ordering is not None else self.rule_to_ordering)
+            elif len(rule_maps[i][1]) > 0:
+                input_grids = []
+                for idx in rule_maps[i][1]:
+                    for attr in rule_to_attr[idx][1]:
+                        input_grids.append(attr_to_values[attr])
+                
+                rule_output = rule.apply_rule(ordering=self.rule_to_ordering[i][1] if self.rule_to_ordering is not None else self.rule_to_ordering,
+                                              input_grids=input_grids)
 
-must be intertwined somehow, otherwise you can just decompose it into each individual attr
-
-we can try some arithmetic type stuff, where things are encoded in binary!
-but quite complicated, and might be hard to do with 3x3?
-
---> problem is it's hard to get enough information across in a 3x3 grid
-
-00 00 00
-01 00 01
-00 01 01
-01 01 10
-11 01 00
-01 11 00
-11 11 01
-
-Noise!
-01 00 11
-00 11 11
-00 01 
-
-'''
+            for attr in rule_output:
+                attr_to_values[attr] = rule_output[attr]
+        
+        # Assign RPM grid elements their values based on the given rules
+        for i in range(self.num_rows):
+            for j in range(self.num_cols):
+                for k, attr_name in zip(range(self.num_attrs_per_cell), self.attr_names):
+                    self.grid[i][j][k] = self.attr_domains[attr_name][attr_to_values[attr_name][i][j]]
+    
+    def get_grid(self):
+        return self.grid
 
 
 def main():
