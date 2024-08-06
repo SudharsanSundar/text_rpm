@@ -1,5 +1,5 @@
 import json
-import pprint as ppr
+from pprint import pprint as ppr
 from matplotlib import pyplot as plt
 import numpy as np
 from sklearn.metrics import r2_score
@@ -9,6 +9,7 @@ import os
 import re
 import math
 from Levenshtein import distance as edit_distance
+from typing import List, Dict, Any
 
 evaled_model_fps = [
     "/data/public_models/huggingface/meta-llama/Meta-Llama-3-70B-Instruct", ##      # running at 128 -> running again at 128 for speed
@@ -55,6 +56,16 @@ evaled_model_fps2 = [
     "/data/public_models/huggingface/01-ai/Yi-6B-Chat", 
 ]
 evaled_models2 = [fp.split('/')[-1] for fp in evaled_model_fps2]
+
+evaled_model_fps3 = [
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct",
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-70B-Instruct",
+    "/data/public_models/huggingface/google/gemma-1.1-2b-it", 
+    "/data/public_models/huggingface/google/gemma-1.1-7b-it", 
+    "/data/public_models/huggingface/01-ai/Yi-6B-Chat",
+    "/data/public_models/huggingface/mistralai/Mixtral-8x7B-Instruct-v0.1",
+]
+evaled_models3 = [fp.split('/')[-1] for fp in evaled_model_fps3]
 
 model_to_param_count = {
   "Meta-Llama-3-70B-Instruct": "70B",
@@ -113,6 +124,34 @@ model_to_tokens_seen = {
   "Yi-34B-Chat": 3_100_000_000_000
 }
 
+'''
+{-7.6: 'Qwen1.5-0.5B-Chat',
+ -4.54: 'Qwen1.5-1.8B-Chat',
+ -4.07: 'gemma-1.1-2b-it',              ====
+ -3.68: 'falcon-7b-instruct',
+ -3.44: 'Qwen1.5-4B-Chat',
+ -2.34: 'Qwen1.5-7B-Chat',
+ -1.85: 'Llama-2-7b-chat-hf',
+ -1.12: 'gemma-1.1-7b-it',              ====
+ -0.76: 'Llama-2-13b-chat-hf',
+ -0.67: 'Yi-6B-Chat',                   ====
+ -0.66: 'Qwen1.5-14B-Chat',
+ -0.62: 'deepseek-llm-7b-chat',         ====
+ 0.56: 'falcon-40b-instruct',
+ 0.73: 'Mistral-7B-Instruct-v0.2',
+ 0.74: 'Qwen1.5-72B-Chat',
+ 0.94: 'Qwen1.5-32B-Chat',
+ 1.13: 'Meta-Llama-3-8B-Instruct',      ====
+ 1.21: 'Llama-2-70b-chat-hf',
+ 1.71: 'Yi-34B-Chat',
+ 2.43: 'Qwen1.5-110B-Chat',
+ 2.58: 'falcon-180B-chat',
+ 2.91: 'deepseek-llm-67b-chat',
+ 3.36: 'Mixtral-8x7B-Instruct-v0.1',    ====x r
+ 3.6: 'dbrx-instruct',
+ 4.57: 'Meta-Llama-3-70B-Instruct',     ====x r
+ 4.87: 'Mixtral-8x22B-Instruct-v0.1'}
+'''
 model_to_gscore = {
     'Qwen1.5-0.5B-Chat': -7.60,
     'Qwen1.5-1.8B-Chat': -4.54,
@@ -362,7 +401,6 @@ for key in model_to_param_count.keys():
 # ppr.pprint(set.intersection(set(list(model_to_gscore.keys())), set(list(model_to_param_count.keys()))))
 
 
-
 def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=False, old_format=False):
     '''
     Analyze how models perform on various subsets of the text RPM eval results
@@ -463,11 +501,11 @@ def score_breakdown(eval_results_fp, model_name, save_folder=None, save_figure=F
     print('Total num improper (shape, values, etc.) answers:', score_breakdown_results['num_formatted_but_improper_answer'])
     if model_name in []:
         print('- - - Absolute total num problems:')
-        ppr.pprint(total_in_category)
+        ppr(total_in_category)
         print('- - - Absolute correct:')
-        ppr.pprint(score_breakdown_results)
+        ppr(score_breakdown_results)
         print('- - - Fraction correct:')
-        ppr.pprint(fraction_correct)
+        ppr(fraction_correct)
     
     title = f'rpm eval analysis/{model_name}'
     save_fp = '_'.join(title.replace('/', '-').split(' '))
@@ -784,14 +822,73 @@ def find_capabilities_correlations(models=evaled_models,
             print('Response not recognized, continuing...')
 
 
-# TODO: Implement a utility to find difficulty correlations
+def find_difficulty_correlation(models: List[str]=evaled_models, 
+                                analysis_fp: str='./v5_results_cleaned/rpm_eval_results2_{model_name}.json',
+                                save_folder: str='./v5_capabilities_comparisons/',
+                                pause: bool=False,
+                                difficulty_range: List[int]=list(range(1, 7, 1)),
+                                difficulty_metric: str='rule_to_attribute',
+                                difficulty_metric_name: str='total_num_rules'):
+    '''
+    Plot average aggregate model performance on text rpm tasks against the difficulty metric
+    '''
+
+    # Find total number right out of total number attempted for each difficulty level across all evaled models
+    difficulty_to_vals = {}
+    for model in models:
+        with open(analysis_fp.format(model_name=model), 'r') as f:
+            results = []
+            for line in f:
+                results.append(json.loads(line))
+            print(model, len(results))
+            for result in results:
+                num_difficulty = len(result['problem_characteristics'][difficulty_metric])
+                if num_difficulty in difficulty_range:
+                    updated_entry = difficulty_to_vals.get(num_difficulty, [0, 0])
+                    updated_entry[0] += result['score'] 
+                    updated_entry[1] += 1
+                    difficulty_to_vals[num_difficulty] = updated_entry
+    
+    # Calculate aggregated acc per difficulty
+    aggregate_acc = [np.log(max(difficulty_to_vals[key][0] / difficulty_to_vals[key][1], 0.000000001)) for key in difficulty_to_vals]
+    print('Num models used in comparison:', len(models))
+
+    # Plot aggregate acc against difficulty
+    plt.bar(difficulty_range, aggregate_acc, color='blue')
+    plt.title(f'Variation of log TextRPM aggregate acc over {difficulty_metric_name}')
+    plt.xlabel(difficulty_metric_name)
+    plt.ylabel(f'log text_rpm_agg_acc (for num_rules={difficulty_range})')
+
+    plt.savefig(f'{save_folder}{difficulty_metric_name}_vs_textrpm_agg_acc.png', dpi=300)
+
+    r2 = r2_score(difficulty_range, aggregate_acc)
+    corr = np.corrcoef(difficulty_range, aggregate_acc)[0, 1]
+    corr2, _ = pearsonr(difficulty_range, aggregate_acc)
+    corr3, pval = spearmanr(a=difficulty_range, b=aggregate_acc)
+    print(f'Pearson correlation coeff between {difficulty_metric_name} and text RPM aggregate acc: {corr} (np), {corr2} (scipy) | Spearman: {corr3} / pval {pval} | R^2: {r2} (skl)')
+
+    plt.show()
+    plt.close()
+
+    if pause:
+        response = input('Continue? ')
+        if response == 'y':
+            print('Continuing!')
+        else:
+            print('Response not recognized, continuing...')
 
 
 def main():
     versions = [
-        'v2',
-        'v4',
+        # 'v2',
+        # 'v4',
+        'v5'
     ]
+    evaled_models_mapping = {
+        'v2': evaled_models,
+        'v4': evaled_models2,
+        'v5': evaled_models3
+    }
     do_cleaning = False
     do_analysis = False
 
@@ -800,6 +897,7 @@ def main():
         cleaned_results_folder = './{v}_results_cleaned/'.format(v=version)
         analysis_save_folder = './{v}_results_analysis/'.format(v=version)
         capabilities_analysis_save_folder = './{v}_capabilities_comparisons/'.format(v=version)
+        evaled_models_v = evaled_models_mapping[version]
 
         if do_cleaning:
             eval_runs_corrections(
@@ -816,10 +914,11 @@ def main():
                 old_format=(version == 'v2')
             )
         
-        # comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
-        comparison_options = ['gscore']
-        # mode = 'all' # [10, 11, 12, 13, 14]
-        mode = [1, 2, 3, 4, 5, 6]
+        comparison_options = ['num_params', 'tokens_seen', 'mmlu', 'human_eval', 'gsm8k', 'math', 'gscore']
+        # comparison_options = ['gscore']
+        mode = 'all' # [10, 11, 12, 13, 14]
+        # mode = [1, 2, 3, 4, 5, 6]
+
         for i in range(1, 2, 1):
             # mode = [j for j in range(1, i + 1, 1)]
             # mode = [i + j* for j in range(i, i + 1, 1)]
@@ -827,13 +926,20 @@ def main():
 
             print('MODE:', mode)
             for opt in comparison_options:
-                find_capabilities_correlations(models=evaled_models2, 
-                                            analysis_fp=analysis_save_folder + 'rpm_eval_analysis-{model_name}.json',
-                                            mode=mode,
-                                            comparison_data=opt,
-                                            save_folder=capabilities_analysis_save_folder,
-                                            pause=False)
+                find_capabilities_correlations(models=evaled_models_v, 
+                                               analysis_fp=analysis_save_folder + 'rpm_eval_analysis-{model_name}.json',
+                                               mode=mode,
+                                               comparison_data=opt,
+                                               save_folder=capabilities_analysis_save_folder,
+                                               pause=False)
             print('-' * 100)
+        
+        find_difficulty_correlation(models=evaled_models_v,
+                                    analysis_fp=cleaned_results_folder + 'rpm_eval_results2_{model_name}.json',
+                                    save_folder=capabilities_analysis_save_folder,
+                                    pause=False,
+                                    difficulty_range=list(range(1, 7, 1)),
+                                    difficulty_metric='rule_to_attribute' if version != 'v2' else 'attribute_to_rule')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Dict, Tuple
-import pprint
+from pprint import pprint as ppr
 from text_rpm_construction import *
 import random
 import itertools
@@ -9,6 +9,9 @@ from datetime import datetime
 import json
 import time
 import math
+from transformers import (
+    AutoTokenizer
+)
 
 SUPPORTED_RULES = (
     'constant_row',
@@ -19,7 +22,8 @@ SUPPORTED_RULES = (
 )
 
 SUPPORTED_META_RULES = (
-    'general_cycle'
+    'general_cycle',
+    'nary'
 )
 
 DEFAULT_RULES_TO_NUM_ATTRS = {
@@ -52,13 +56,29 @@ DEFAULT_PROMPT_TEMPLATE = {
 }
 
 
-def ppr(input_val):
-    pprint.pprint(input_val)
-
-
 class RPMDataset:
     def __init__(self) -> None:
         pass
+
+    @staticmethod # TODO: Problem is it's not consistent with the prompt if you use english words in the tuples etc.
+    def generate_random_alphabet(values_per_attribute, num_attrs, tokenizer_path='/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct'):
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
+                                                  use_fast=False,
+                                                  padding_side='left',
+                                                  trust_remote_code=True)
+        
+        tokenizer_vocab = list(tokenizer.get_vocab().keys())
+        all_vocab = []
+        while len(all_vocab) < values_per_attribute * num_attrs:
+            sample = random.choice(tokenizer_vocab)
+            try:
+                sample.encode('ascii')
+                all_vocab.append(sample)
+            except:
+                print('not unicode string, trying new')
+
+        randomized_vocab = [all_vocab[i:i + values_per_attribute] for i in range(0, values_per_attribute * num_attrs, values_per_attribute)]
+        return randomized_vocab
 
     @staticmethod
     def generate_default_alphabet(values_per_attribute, num_attrs, val_type='alpha'):
@@ -584,17 +604,25 @@ def main():
     #     meta_rules=['general_cycle']
     # )
 
-    # Binary rule dataset generation example
-    # TODO: Generation is way too slow at >3 num_rules. Try to make more efficient (e.g. try to go straight to second sampling stage, which should easily be possible)
+    # # Binary rule dataset generation example
+    # RPMDataset.generate_dataset(
+    #     max_num_rules=6,
+    #     num_rows=5,
+    #     num_cols=5,
+    #     rule_constructs={},
+    #     valid_rules=[],
+    #     meta_rules=['general_cycle', 'nary'],
+    #     default_alphabet_type='num',
+    #     dataset_id='v5'
+    # )
+
+    # Exotic alphabet generation example
     RPMDataset.generate_dataset(
-        max_num_rules=6,
-        num_rows=5,
-        num_cols=5,
-        rule_constructs={},
-        valid_rules=[],
-        meta_rules=['general_cycle', 'nary'],
-        default_alphabet_type='num',
-        dataset_id='v5'
+        max_num_rules=5,
+        num_rows=3,
+        num_cols=3,
+        attribute_alphabet=[['!', '@', '#'], ['$', '%', '^'], ['&', '-', '='], ['+', '>', '<'], ['/', '|', '~']],
+        dataset_id='twist'
     )
 
 

@@ -297,13 +297,6 @@ def main():
                               use_hf_pipeline=args.use_hf_pipeline,
                               api=args.use_api)
 
-    # eval_model_on_rpm(model_name=args.model_name_or_path,
-    #                   model_org=args.model_org,
-    #                   eval_dataset_path=args.eval_dataset_path,
-    #                   results_save_folder=args.results_save_folder,
-    #                   limit_num_problems=args.limit_num_problems if args.limit_num_problems is None else {'method': args.limit_num_problems.split(',')[0], 'num_problems': int(args.limit_num_problems.split(',')[1])},
-    #                   api=args.use_api)
-
 
 if __name__ == '__main__':
     main()

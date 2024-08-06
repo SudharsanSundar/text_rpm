@@ -59,6 +59,7 @@ base_model_directories = [
 chat_model_directories = [
     "/data/public_models/huggingface/meta-llama/Meta-Llama-3-70B-Instruct",  # Meta llama models, gen 3, 2
     "/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct",
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct",
     "/data/public_models/huggingface/meta-llama/Llama-2-13b-chat-hf",
     "/data/public_models/huggingface/meta-llama/Llama-2-70b-chat-hf",
     "/data/public_models/huggingface/meta-llama/Llama-2-7b-chat-hf",
@@ -275,8 +276,8 @@ def main():
 #             print('/ / / / /')
 #         print('-' * 100)
     
-    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-27b-it")
-    model = AutoModelForCausalLM.from_pretrained("google/gemma-2-27b-it")
+    tokenizer = AutoTokenizer.from_pretrained("/data/public_models/huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct")
+    model = AutoModelForCausalLM.from_pretrained("/data/public_models/huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct")
     print('MODELS CALLED')
 
 

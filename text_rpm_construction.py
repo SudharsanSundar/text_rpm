@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Any, List, Dict
-import pprint as ppr
+from pprint import pprint as ppr
 
 SUPPORTED_RULE_TYPES = ['dependent', 'independent']
 
