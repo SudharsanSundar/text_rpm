@@ -3,6 +3,10 @@ from rpm import RPMMaker
 import dataset
 import random
 import json
+import numpy as np
+from typing import List
+from pprint import pprint as ppr
+import math
 
 DEFAULT_ALPHABET = tuple([[chr(65 + i + 3 * j) for i in range(3)] for j in range(8)] + 
                          [[chr(97 + i + 3 * j) for i in range(3)] for j in range(8)])   # lowercase letters augmented
@@ -51,9 +55,45 @@ def check_num_rules_problems(num_rules):
                 eval_problems.append(problem)
         
 
+def round_up(x):
+    return int(math.ceil(x))
+
+
+def num_seq_stack(base_seqs: List[List[int]], 
+                  depth: int, 
+                  num_repeats_before_pred: int,
+                  num_pred: int=3):
+    assert depth >= 0
+
+    longest_base_seq_len = max(len(base_seq) for base_seq in base_seqs)
+    num_extra_digits = num_pred + depth
+    num_extra_repeats = round_up(num_extra_digits / longest_base_seq_len)
+    num_to_cut = num_extra_digits % len(base_seq)
+    final_seq_len = longest_base_seq_len * (num_repeats_before_pred + num_extra_repeats) - num_to_cut
+
+    final_seq = np.zeros(final_seq_len)
+
+    for base_seq in base_seqs:
+        temp_seq = np.array(base_seq * round_up(final_seq_len / len(base_seq)))
+        temp_seq = temp_seq[:final_seq_len]
+
+        for i in range(depth):
+            temp_seq = np.cumsum(final_seq)
+        
+        final_seq += temp_seq
+        
+    return list(final_seq[:-num_pred]), list(final_seq[-num_pred:])
+
 
 def main():
-    create_example_problem(num_rules=14)
+    for i in range(4):
+        seq, ans = num_seq_stack(
+            base_seqs=[[1]],
+            depth=i,
+            num_repeats_before_pred=3
+        )
+        print(str(seq)[1:-1], '->', str(ans)[1:-1])
+        print('-----')
 
 
 if __name__ == '__main__':
