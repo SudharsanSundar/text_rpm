@@ -527,7 +527,7 @@ class RPMDataset:
             rulesets = random.sample(all_rulesets, k=min(len(all_rulesets), ruleset_breadth))
             print('RULESETS', len(rulesets))
             
-            # # Go through all possible sequences of rules used for sequence of n length
+            # # Go through sequences of rules for sequence of length n
             n_rules_problems = []
             for ruleset in rulesets:
                 # # Prepare problem details
@@ -535,12 +535,12 @@ class RPMDataset:
                 attributes = RPMDataset.choose_attribute_names(rules_to_num_attrs, ruleset, all_attributes)
 
                 # Shuffle ruleset and get rule maps (i.e. which rules each rule depends on; nary (binary) rules must be idx >= 2, but otherwise are free to stack)
-                ruleset, rule_maps = RPMDataset.shuffle_ruleset_and_map(ruleset)
+                ruleset, rule_maps = RPMDataset.shuffle_ruleset_and_map(ruleset) # TODO: This is where I can change dependence choice
                 random.shuffle(attributes)
                 
                 # Assign rules to attributes
                 attribute_to_values = {attribute: values for attribute, values in zip(attributes, attribute_alphabet)}
-                rule_to_attribute = RPMDataset.assign_rule_to_attribute(ruleset, attributes, rules_to_num_attrs)
+                rule_to_attribute = RPMDataset.assign_rule_to_attribute(ruleset, attributes, rules_to_num_attrs)    # TODO: Might need to make this compatible
 
                 # Generate all possible rule_configs for this ruleset
                 all_rule_configs = RPMDataset.generate_rule_configs(rule_to_attribute, num_cols, attribute_to_values, fallback_sample_size=min_configs_per_ruleset, max_num_configs=1000)
@@ -549,6 +549,7 @@ class RPMDataset:
                 # Go through all possible configs for the given ruleset
                 for rule_config in rule_configs:
                     # Generate the Text RPM problem and format it for the dataset
+                    # TODO: Make sure that generation can handle various dependency orders etc.
                     example = RPMDataset.generate_and_format_problem(num_rows, 
                                                                      num_cols, 
                                                                      attributes, 

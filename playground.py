@@ -9,9 +9,8 @@ from pprint import pprint as ppr
 import math
 
 DEFAULT_ALPHABET = tuple([[chr(65 + i + 3 * j) for i in range(3)] for j in range(8)] + 
-                         [[chr(97 + i + 3 * j) for i in range(3)] for j in range(8)])   # lowercase letters augmented
-# DEFAULT_ALPHABET = tuple([[chr(65 + i + 3 * j) for i in range(3)] for j in range(8)] + 
-#                          [[i + 3 * j for i in range(1, 4, 1)] for j in range(6)])   # numbers augmented
+                         [[chr(97 + i + 3 * j) for i in range(3)] for j in range(8)]) 
+
 DEFAULT_ATTRIBUTES = ('shape_type',
                       'inner_shape_type',
                       'shape_color',
@@ -59,40 +58,91 @@ def round_up(x):
     return int(math.ceil(x))
 
 
-def num_seq_stack(base_seqs: List[List[int]], 
-                  depth: int, 
-                  num_repeats_before_pred: int,
-                  num_pred: int=3):
-    assert depth >= 0
+class PatternSeq:
+    def __init__(self,
+                 base_seqs: List[List[int]], 
+                 depth: int, 
+                 num_repeats_before_pred: int,
+                 num_pred: int=3) -> None:
+        '''
+        num base seqs [1, ...]
+        base seq len(s) [1, ...]
+        base seq inter-div (prefix-free? also not sure how to measure this)
+        base seq vocab (intra-div) [[0,1], [-1,0], [-1,1] [-1,0,1], [0,1,2], ...]
+        depth [0, ...]
 
-    longest_base_seq_len = max(len(base_seq) for base_seq in base_seqs)
-    num_extra_digits = num_pred + depth
-    num_extra_repeats = round_up(num_extra_digits / longest_base_seq_len)
-    num_to_cut = num_extra_digits % len(base_seq)
-    final_seq_len = longest_base_seq_len * (num_repeats_before_pred + num_extra_repeats) - num_to_cut
-
-    final_seq = np.zeros(final_seq_len)
-
-    for base_seq in base_seqs:
-        temp_seq = np.array(base_seq * round_up(final_seq_len / len(base_seq)))
-        temp_seq = temp_seq[:final_seq_len]
-
-        for i in range(depth):
-            temp_seq = np.cumsum(final_seq)
+        depth operator diversity [cumsum, cumprod, subset sum, subset prod, flip, negative, etc.?]
         
-        final_seq += temp_seq
-        
-    return list(final_seq[:-num_pred]), list(final_seq[-num_pred:])
+        '''
+        self.num_base_seqs = base_seqs
+        self.depth = depth
+        self.num_repeats_before_pred = num_repeats_before_pred
+        self.num_pred = num_pred
+
+    @staticmethod
+    def num_seq_stack(base_seqs: List[List[int]], 
+                      depth: int, 
+                      num_repeats_before_pred: int,
+                      num_pred: int=3):
+        assert depth >= 0
+
+        longest_base_seq_len = max(len(base_seq) for base_seq in base_seqs)
+        num_extra_digits = num_pred + depth
+        num_extra_repeats = round_up(num_extra_digits / longest_base_seq_len)
+        num_to_cut = num_extra_digits % longest_base_seq_len
+        final_seq_len = longest_base_seq_len * (num_repeats_before_pred + num_extra_repeats) - num_to_cut
+        # NOTE: One difficulty metric: the number of unique vertical sequences formed by stack of base seqs = how mutually diverse they are
+
+        final_seq = np.zeros(final_seq_len, dtype=int)
+
+        for base_seq in base_seqs:
+            temp_seq = np.array(base_seq * round_up(final_seq_len / len(base_seq)), dtype=int)
+            temp_seq = temp_seq[:final_seq_len]
+
+            for i in range(depth):
+                temp_seq = np.cumsum(temp_seq, dtype=int)
+            
+            final_seq += temp_seq
+            
+        return list(final_seq[:-num_pred]), list(final_seq[-num_pred:])
+
+
+def generate_all_seq_combos(max_len=4, moveset=[0, 1]):
+    def generate_combos(combo_len, combo):
+        if len(combo) == combo_len:
+            combos[combo_len].append(combo)
+        else:
+            for move in moveset:
+                generate_combos(combo_len, combo + [move])
+    
+    all_combos = []
+    combos = {i: [] for i in range(1, max_len + 1, 1)}
+    for i in range(1, max_len + 1, 1):
+        generate_combos(i, [])
+    
+    def generate_combo_combos(ccombo):
+        if len(ccombo) == max_len:
+            all_combos.append(ccombo)
+        else:
+            for combo in combos[len(ccombo) + 1]:
+                generate_combo_combos(ccombo + [combo])
+    
+    generate_combo_combos([])
+    return all_combos
 
 
 def main():
-    for i in range(4):
-        seq, ans = num_seq_stack(
-            base_seqs=[[1]],
-            depth=i,
+    all_4_seq_combos = generate_all_seq_combos(max_len=4)
+
+    for i in range(10):
+        sampled_base_seqs = random.choice(all_4_seq_combos)
+        seq, ans = PatternSeq.num_seq_stack(
+            base_seqs=sampled_base_seqs,
+            depth=0,
             num_repeats_before_pred=3
         )
         print(str(seq)[1:-1], '->', str(ans)[1:-1])
+        print(f'({sampled_base_seqs})')
         print('-----')
 
 
