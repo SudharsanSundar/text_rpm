@@ -1,7 +1,16 @@
 v2_results_cleaned/
 v2_results_analysis/
 v2_results/
+v4_results_cleaned/
+v4_results_analysis/
+v4_results/
+v5_results_cleaned/
+v5_results_analysis/
+v5_results/
 tokenization_vis/
 eval_runs_details/
 datasets/
+results/
+analysis/
+archive/
 __pycache__/

@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Any, List, Dict
 from pprint import pprint as ppr
+import random
 
 SUPPORTED_RULE_TYPES = ['dependent', 'independent']
 
@@ -224,7 +225,6 @@ class Diagonals(RPMRule):
         return self.attr_to_values
 
 
-# TODO: All of these can be solved by just choosing the missing number
 class GeneralCycle(RPMRule):
     def __init__(self, 
                  attr_names: List[str] | None, 
@@ -254,7 +254,7 @@ class GeneralCycle(RPMRule):
                 and all(type(elem) == int for elem in ordering['row_starts']) \
                 and len(ordering.keys()) == 2
         
-        row_starts = ordering['row_starts']
+        row_starts = ordering['row_starts'] 
         grid = []
         for row_start in row_starts:
             grid.append([ordering['order'][(row_start + path_pos) % self.num_cols] for path_pos in self.path])
@@ -263,7 +263,50 @@ class GeneralCycle(RPMRule):
         return self.attr_to_values
 
 
-def generate_all_cycle_rules(attr_names=None, n=5, l=5):
+class GeneralCycle2(RPMRule):
+    def __init__(self, 
+                 attr_names: List[str] | None, 
+                 rule_name: str, 
+                 num_rows: int, 
+                 num_cols: int,
+                 rel_path: List[int]) -> None:
+        if attr_names is None:
+            attr_names = [None] * num_cols
+        super().__init__(attr_names, rule_name, num_rows, num_cols)
+
+        self.rel_path = rel_path
+    
+    def __call__(self, attr_names, rule_name, num_rows, num_cols) -> Any:
+        return GeneralCycle2(attr_names, rule_name, num_rows, num_cols, rel_path=self.rel_path)
+
+    def apply_rule(self, ordering) -> Dict[str, List[List[int]]]:
+        if ordering is None:
+            ordering = {'order': range(self.num_cols), 'row_starts': range(self.num_rows)}
+        else:
+            assert 'order' in ordering \
+                and type(ordering['order']) == list \
+                and all(type(elem) == int for elem in ordering['order']) \
+                and len(ordering['order']) == self.num_cols \
+                and 'row_starts' in ordering \
+                and type(ordering['row_starts']) == list \
+                and all(type(elem) == int for elem in ordering['row_starts']) \
+                and len(ordering.keys()) == 2
+        
+        row_starts = ordering['row_starts']
+        paths = []
+        for i in range(len(self.rel_path) + 1): # This is a fixed pattern. Could vary this too, but don't have time to implement rn
+            temp_path = self.rel_path[i:] + self.rel_path[:i]
+            paths.append([int(elem) for elem in np.cumsum(temp_path, dtype=int)])
+
+        grid = []
+        for row_start, path in zip(row_starts, paths):
+            grid.append([ordering['order'][(row_start + path_pos) % self.num_cols] for path_pos in path])
+                
+        self.attr_to_values[self.attr_names[0]] = grid
+        return self.attr_to_values
+
+
+def generate_all_cycle_rules(attr_names=None, n=5, l=5, balance_with_binary=True, balance_factor=1.25):
     def generate_paths(lim_n, it, path):
         if it == lim_n:
             all_paths.append(path)
@@ -284,6 +327,38 @@ def generate_all_cycle_rules(attr_names=None, n=5, l=5):
             num_cols=l,
             path=path
         )
+    
+    if balance_with_binary:
+        kept_cycles = random.sample(list(general_cycle_rules.keys()), k=int(len(generate_nary_rules(attr_names=None, n=n, l=n, a_len=l, b_len=l)) * balance_factor))
+        general_cycle_rules = {key: general_cycle_rules[key] for key in kept_cycles}
+    
+    return general_cycle_rules
+
+
+def generate_all_cycle2_rules(attr_names=None, n=5, l=5, balance_with_binary=True, balance_factor=1.25):
+    def generate_paths(lim_n, it, path):
+        if it == lim_n:
+            all_paths.append(path)
+        else:
+            for elem in [-1, 0, 1]:
+                generate_paths(lim_n, it + 1, path + [elem])
+
+    all_paths = []
+    generate_paths(l - 1, 0, [0])
+
+    general_cycle_rules = {}
+    for i, path in enumerate(all_paths):
+        general_cycle_rules[f'general_cycle2_{i}'] = GeneralCycle2(
+            attr_names=attr_names, 
+            rule_name=f'general_cycle2_{i}', 
+            num_rows=n, 
+            num_cols=l,
+            rel_path=path
+        )
+    
+    if balance_with_binary:
+        kept_cycles = random.sample(list(general_cycle_rules.keys()), k=int(len(generate_nary_rules(attr_names=None, n=n, l=n, a_len=l, b_len=l)) * balance_factor))
+        general_cycle_rules = {key: general_cycle_rules[key] for key in kept_cycles}
     
     return general_cycle_rules
 
@@ -321,6 +396,7 @@ class NaryRule(RPMRule):
     
     def apply_rule(self, input_grids, ordering=None) -> Dict[str, List[List[int]]]:
         assert ordering is None
+        assert len(input_grids) > 1
 
         new_grid = []
         for i in range(self.num_rows):
@@ -335,32 +411,33 @@ class NaryRule(RPMRule):
         return self.attr_to_values
 
 
-def generate_nary_rules(attr_names=None, n=5, l=5, a_len=5, nary=2, b_len=3):
-    # # Complex: Computing all possible mappings of the input domain to all subsets of the output domain
-    # def compute_input_domain(idx, input_tuple):
-    #     if idx == nary:
-    #         domain.append(input_tuple)
-    #     else:
-    #         for i in range(a_len):
-    #             compute_input_domain(idx + 1, input_tuple + [i])
-    
-    # domain = []
-    # compute_input_domain(0, [])
-    # domain = [tuple(elem) for elem in domain]
-    
-    # operations = None # TODO: Generate all mappings to outputs
-
-    # # Simple: Only basic logic-based binary mappings to binary or ternary alphabet
+def generate_nary_rules(attr_names=None, n=5, l=5, a_len=5, nary=2, b_len=5):
+    # # Simple: Only basic logic- or arithmetic-based mappings to full, ternary, or binary alphabet
     assert nary == 2
-    assert b_len == 3
+    assert b_len == a_len
+    assert a_len >= 3
+
     mid = int(a_len / 2)
     operations = [
+        lambda x, y: min(x + y, a_len - 1), # up to ceil ; 0 to a_len-1 ; archetype: arithmetic tree, w min max etc., all mod a_len
+        lambda x, y: abs(x - y), # abs difference
+        lambda x, y: int((x + y) / 2), # avg
+        lambda x, y: int(abs(x - y) / 2), # abs difference from avg
+        lambda x, y: max(x, y), # max
+        lambda x, y: int(max(x, y) / 2), # half the max
+        lambda x, y: min(x, y), # min
+        lambda x, y: int(min(x, y) * 2) % a_len, # twice the min mod a_len
+        lambda x, y: (x + y) % a_len, # addition on field
+        lambda x, y: (x * y) % a_len, # multiplication on field
+        lambda x, y: int(x >= mid) + int(y >= mid), # 012
+        lambda x, y: int(x >= mid) + int(y <= mid),
+        lambda x, y: int(x <= mid) + int(y <= mid),
+        lambda x, y: int(x <= mid) + int(y >= mid),
         lambda x, y: int(x == y), # 01
         lambda x, y: int(x != y),
         lambda x, y: x >= y,
         lambda x, y: x <= y,
-        lambda x, y: int(x >= mid) + int(y >= mid), #012
-        lambda x, y: x >= mid and y >= mid, #01
+        lambda x, y: x >= mid and y >= mid,
         lambda x, y: x <= mid and y <= mid,
         lambda x, y: (x >= mid and y <= mid) or (x <= mid and y >= mid),
         lambda x, y: x >= mid or y >= mid,
@@ -435,28 +512,53 @@ class RPMProblem:
             ) and all(
             type(pair[1]) == list and (all(type(elem) == int for elem in pair[1]) or len(pair[1]) == 0) for pair in rule_maps
         )
-        assert self.rule_to_ordering is None or ( # TODO: Debug issue here
+        assert self.rule_to_ordering is None or (
             all(pair[0] in [pair2[0] for pair2 in self.rule_to_attr] for pair in self.rule_to_ordering) and 
             all(pair2[0] in [pair[0] for pair in self.rule_to_ordering] for pair2 in self.rule_to_attr) and 
             all(pair[0] == pair2[0] for pair, pair2 in zip(self.rule_to_attr, rule_to_ordering))
         )
+        if not all(len(rule_maps[i][1]) == 0 for i, rule in enumerate(self.rules) if rule.rule_name[:len('nary')] != 'nary'):
+            print(rule_maps)
+            print([len(rule_maps[i][1]) == 0 for i, rule in enumerate(self.rules) if rule.rule_name[:len('nary')] != 'nary'])
+            assert all(len(rule_maps[i][1]) == 0 for i, rule in enumerate(self.rules) if rule.rule_name[:len('nary') != 'nary'])
+        assert all(len(rule_maps[i][1]) > 1 for i, rule in enumerate(self.rules) if rule.rule_name[:len('nary')] == 'nary')
+        
+        # !! Assumes each rule yields values for exactly 1 attribute !!
+
+        rules_to_values = [None] * len(self.rules)
+        it = 0
+        while None in rules_to_values:  # Number of iterations should equal maximum dependency depth
+            it += 1
+            for i, rule in enumerate(self.rules):
+                if len(rule_maps[i][1]) == 0:   # Independent rules
+                    rule_output = rule.apply_rule(ordering=self.rule_to_ordering[i][1] if self.rule_to_ordering is not None else self.rule_to_ordering)
+                    rules_to_values[i] = rule_output
+                elif len(rule_maps[i][1]) > 1:  # Dependent rules
+                    input_grids = []
+                    for idx in rule_maps[i][1]:
+                        if rules_to_values[idx] is not None:
+                            for attr in rules_to_values[idx]:
+                                input_grids.append(rules_to_values[idx][attr])
+                        else:
+                            input_grids.append(None)
+                    
+                    if None not in input_grids: # If last layer of dependencies has been filled, fill in the given dependent rule
+                        rule_output = rule.apply_rule(ordering=self.rule_to_ordering[i][1] if self.rule_to_ordering is not None else self.rule_to_ordering,
+                                                      input_grids=input_grids)
+                        rules_to_values[i] = rule_output
+            
+            if it > 20: # TODO: Debugging
+                print(rules_to_values)
+                print(rule_maps)
+
+                assert False
+
         
         attr_to_values = {}
-        for i, rule in enumerate(self.rules):
-            if len(rule_maps[i][1]) == 0:
-                rule_output = rule.apply_rule(ordering=self.rule_to_ordering[i][1] if self.rule_to_ordering is not None else self.rule_to_ordering)
-            elif len(rule_maps[i][1]) > 0:
-                input_grids = []
-                for idx in rule_maps[i][1]:
-                    for attr in rule_to_attr[idx][1]:
-                        input_grids.append(attr_to_values[attr])
-                
-                rule_output = rule.apply_rule(ordering=self.rule_to_ordering[i][1] if self.rule_to_ordering is not None else self.rule_to_ordering,
-                                              input_grids=input_grids)
+        for i, rule in enumerate(self.rules):   # Sync rule outputs to attr_to_values
+            for attr in rules_to_values[i]:
+                attr_to_values[attr] = rules_to_values[i][attr]
 
-            for attr in rule_output:
-                attr_to_values[attr] = rule_output[attr]
-        
         # Assign RPM grid elements their values based on the given rules
         for i in range(self.num_rows):
             for j in range(self.num_cols):
@@ -468,18 +570,21 @@ class RPMProblem:
 
 
 def main():
-    print('~'*100)
-    test_problem = RPMProblem(
-        num_rows=5,
-        num_cols=5,
-        attr_names=['shape', 'color', 'texture'],
-        attr_domains={'shape': ['A', 'B', 'C', 'D', 'E'], 'color': ['A', 'B', 'C', 'D', 'E'], 'texture': ['A', 'B', 'C', 'D', 'E']},
-        rule_to_attr=[['constant_row', ['shape']], ['constant_col', ['color']], ['diagonals', ['texture']]],
-        rule_to_ordering=[['constant_row', {'order': [0, 1, 2, 3, 4]}], ['constant_col', {'order': [0, 1, 2, 3, 4]}], ['diagonals', {'order': [0, 1, 2, 3, 4], 'sign': 1}]]
-    )
-    print('-'*100)
-    for row in test_problem.grid:
-        print(row)
+    # print('~'*100)
+    # test_problem = RPMProblem(
+    #     num_rows=5,
+    #     num_cols=5,
+    #     attr_names=['shape', 'color', 'texture'],
+    #     attr_domains={'shape': ['A', 'B', 'C', 'D', 'E'], 'color': ['A', 'B', 'C', 'D', 'E'], 'texture': ['A', 'B', 'C', 'D', 'E']},
+    #     rule_to_attr=[['constant_row', ['shape']], ['constant_col', ['color']], ['diagonals', ['texture']]],
+    #     rule_to_ordering=[['constant_row', {'order': [0, 1, 2, 3, 4]}], ['constant_col', {'order': [0, 1, 2, 3, 4]}], ['diagonals', {'order': [0, 1, 2, 3, 4], 'sign': 1}]]
+    # )
+    # print('-'*100)
+    # for row in test_problem.grid:
+    #     print(row)
+    
+    print(len(generate_nary_rules(None, n=5, l=5, a_len=5, nary=2, b_len=5)))
+    print(len(generate_all_cycle_rules(None, n=5, l=5)))
 
 
 if __name__ == '__main__':

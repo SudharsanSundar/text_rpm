@@ -112,12 +112,22 @@ class RPMDataset:
                 valid_rules += rule_names
                 rule_constructs = rule_constructs | new_rule_constructs
                 rules_to_num_attrs = rules_to_num_attrs | {key: 1 for key in rule_names}
+            elif meta_rule == 'general_cycle2':
+                new_rule_constructs = generate_all_cycle2_rules(
+                    n=num_rows,
+                    l=num_cols,
+                    attr_names=None
+                )
+                rule_names = list(new_rule_constructs.keys())
+                valid_rules += rule_names
+                rule_constructs = rule_constructs | new_rule_constructs
+                rules_to_num_attrs = rules_to_num_attrs | {key: 1 for key in rule_names}
             elif meta_rule == 'nary':
                 new_rule_constructs = generate_nary_rules(
                     n=num_rows,
                     l=num_cols,
                     a_len=num_cols,
-                    b_len=3,
+                    b_len=num_cols,
                     nary=2,
                     attr_names=None
                 )
@@ -175,6 +185,24 @@ class RPMDataset:
         return attributes
 
     @staticmethod
+    def find_valid_map_idxs(i, rule, excluded_idxs, final_ruleset): 
+        all_excluded = []
+
+        def search_exclusion_branches(rrule, rr_idx):            
+            for new_excluded_idx in excluded_idxs[rrule + f'_{rr_idx}']:
+                if new_excluded_idx not in all_excluded:
+                    all_excluded.append(new_excluded_idx)
+                    search_exclusion_branches(final_ruleset[new_excluded_idx], new_excluded_idx)
+
+        for excluded_idx in excluded_idxs[rule + f'_{i}']:
+            all_excluded.append(excluded_idx)
+            search_exclusion_branches(final_ruleset[excluded_idx], excluded_idx)
+        
+        excluded_idxs[rule + f'_{i}'] = all_excluded
+                
+        return [j for j in range(len(final_ruleset)) if j not in excluded_idxs[rule + f'_{i}']], excluded_idxs
+
+    @staticmethod
     def shuffle_ruleset_and_map(ruleset):
         independent_rules = []
         dependent_rules = []
@@ -186,9 +214,11 @@ class RPMDataset:
         
         random.shuffle(independent_rules)
         if len(dependent_rules) > 0:
-            random.shuffle(dependent_rules)     # !! Careful, might not work with some rules
+            random.shuffle(dependent_rules)
 
-            insertion_idxs = random.sample(range(2, len(independent_rules) + len(dependent_rules), 1), k=len(dependent_rules))   # !! Assumes binary nary rules
+            # !! Careful, assumes binary order-irrelevant binary rules !!
+
+            insertion_idxs = random.sample(range(0, len(independent_rules) + len(dependent_rules), 1), k=len(dependent_rules))   # !! Assumes binary nary rules
             idx_0 = 0
             idx_1 = 0
             final_ruleset = []
@@ -200,12 +230,19 @@ class RPMDataset:
                     final_ruleset.append(independent_rules[idx_0])
                     idx_0 += 1
             
-            assert idx_0 == len(independent_rules) and idx_1 == len(dependent_rules) and len(independent_rules) + len(dependent_rules) == len(final_ruleset)
+            assert idx_0 == len(independent_rules) and idx_1 == len(dependent_rules) and len(independent_rules) + len(dependent_rules) == len(final_ruleset) and len(final_ruleset) == len(ruleset)
 
             final_maps = []
+            excluded_idxs = {rule + f'_{i}': [i] if rule[:len('nary')] == 'nary' else [] for i, rule in enumerate(final_ruleset)}
             for i, rule in enumerate(final_ruleset):
                 if rule[:len('nary')] == 'nary':
-                    final_maps.append([rule, [i - 1, i - 2]])
+                    valid_idxs, excluded_idxs = RPMDataset.find_valid_map_idxs(i, rule, excluded_idxs, final_ruleset) # Have dependent rule depend on any 2 unique rules while avoiding dependency cycles
+
+                    map_idxs = random.sample(valid_idxs, k=2) 
+                    for mapped_rule, idx in zip([final_ruleset[idx] for idx in map_idxs], map_idxs):
+                        excluded_idxs[mapped_rule + f'_{idx}'].append(i)
+                    
+                    final_maps.append([rule, map_idxs])    
                 else:
                     final_maps.append([rule, []])
             
@@ -227,13 +264,15 @@ class RPMDataset:
     @staticmethod
     def generate_rule_configs(rule_to_attribute, num_cols, attribute_to_values, fallback_sample_size=None, max_num_configs=1000, sample_fallback_threshold=10**6):
         all_configs = []
-        rule_to_config_space_size = {
-            'constant_col': 6, 
-            'constant_row': 6, 
-            'cycle_n': 6*2, 
-            'diagonals': 6*2, 
-            'cycle_n_minus_1': 6*6, 
-            'general_cycle': 6*6, 
+        base_num = math.factorial(len(rule_to_attribute))
+        rule_to_config_space_size = {       # !! Assumes 1 attribute per rule !!
+            'constant_col': base_num, 
+            'constant_row': base_num, 
+            'cycle_n': base_num*2, 
+            'diagonals': base_num*2, 
+            'cycle_n_minus_1': base_num**2, 
+            'general_cycle_': base_num**2,
+            'general_cycle2': base_num*len(rule_to_attribute)**len(rule_to_attribute),
             'nary': 1
         }
 
@@ -292,8 +331,23 @@ class RPMDataset:
                                 ]
 
                                 compute_config_variations(rule_idx + 1, config + [rule_config])
-                elif rule[:len('general_cycle')] == 'general_cycle':
+                elif rule[:len('general_cycle_')] == 'general_cycle_':
                     row_start_permutations = order_permutations
+                    random.shuffle(row_start_permutations)
+                    for order_permutation in order_permutations:
+                        for row_start_permutation in row_start_permutations:
+                            rule_config = [
+                                rule, 
+                                {
+                                    'order': order_permutation,
+                                    'row_starts': row_start_permutation,
+                                }
+                            ]
+
+                            compute_config_variations(rule_idx + 1, config + [rule_config])
+                elif rule[:len('general_cycle2_')] == 'general_cycle2_':
+                    row_start_permutations = itertools.product([i % len(attribute_to_values[rule_to_attribute[rule_idx][1][0]]) for i in range(num_cols)], repeat=num_cols)
+                    row_start_permutations = [list(item) for item in row_start_permutations]
                     random.shuffle(row_start_permutations)
                     for order_permutation in order_permutations:
                         for row_start_permutation in row_start_permutations:
@@ -344,8 +398,18 @@ class RPMDataset:
                             'shift': random.choice(shift_permutations),
                         }
                     ]
-                elif rule[:len('general_cycle')] == 'general_cycle':
+                elif rule[:len('general_cycle_')] == 'general_cycle_':
                     row_start_permutations = order_permutations
+                    rule_config = [
+                        rule, 
+                        {
+                            'order': random.choice(order_permutations),
+                            'row_starts': random.choice(row_start_permutations),
+                        }
+                    ]
+                elif rule[:len('general_cycle2')] == 'general_cycle2':
+                    row_start_permutations = itertools.product([i % len(attribute_to_values[rule_to_attribute[rule_idx][1][0]]) for i in range(num_cols)], repeat=num_cols)
+                    row_start_permutations = [list(item) for item in row_start_permutations]
                     rule_config = [
                         rule, 
                         {
@@ -370,7 +434,8 @@ class RPMDataset:
 
         # If combinatorial explosion from num rules, just randomly sample the space. 6 is a lower bound, based on only ordering config
         if math.prod([rule_to_config_space_size.get(pair[0], 1) for pair in rule_to_attribute] + 
-                     [rule_to_config_space_size['general_cycle'] for pair in rule_to_attribute if pair[0][:len('general_cycle')] == 'general_cycle'] +
+                     [rule_to_config_space_size['general_cycle_'] for pair in rule_to_attribute if pair[0][:len('general_cycle_')] == 'general_cycle_'] +
+                     [rule_to_config_space_size['general_cycle2'] for pair in rule_to_attribute if pair[0][:len('general_cycle2')] == 'general_cycle2'] +
                      [rule_to_config_space_size['nary'] for pair in rule_to_attribute if pair[0][:len('nary')] == 'nary']) > max_num_configs:
             # Randomly sample rulesets. 1 in 1M chance of duplicate (~lottery odds), so ((1M - 1)/1M)^num_samples odds of no repeats.
             assert fallback_sample_size is not None
@@ -524,7 +589,7 @@ class RPMDataset:
             print('> > > NUM RULES NOW:', num_rules)
             start_time = time.time()
             all_rulesets = RPMDataset.generate_rulesets(num_rules, fallback_sample_size=max_num_problems_per_num_rules, rule_list=valid_rules, min_num_rules=min_num_rules)
-            rulesets = random.sample(all_rulesets, k=min(len(all_rulesets), ruleset_breadth))
+            rulesets = random.sample(all_rulesets, k=min(len(all_rulesets), max_num_problems_per_num_rules))
             print('RULESETS', len(rulesets))
             
             # # Go through sequences of rules for sequence of length n
@@ -535,21 +600,20 @@ class RPMDataset:
                 attributes = RPMDataset.choose_attribute_names(rules_to_num_attrs, ruleset, all_attributes)
 
                 # Shuffle ruleset and get rule maps (i.e. which rules each rule depends on; nary (binary) rules must be idx >= 2, but otherwise are free to stack)
-                ruleset, rule_maps = RPMDataset.shuffle_ruleset_and_map(ruleset) # TODO: This is where I can change dependence choice
+                ruleset, rule_maps = RPMDataset.shuffle_ruleset_and_map(ruleset)
                 random.shuffle(attributes)
                 
                 # Assign rules to attributes
                 attribute_to_values = {attribute: values for attribute, values in zip(attributes, attribute_alphabet)}
-                rule_to_attribute = RPMDataset.assign_rule_to_attribute(ruleset, attributes, rules_to_num_attrs)    # TODO: Might need to make this compatible
+                rule_to_attribute = RPMDataset.assign_rule_to_attribute(ruleset, attributes, rules_to_num_attrs)
 
                 # Generate all possible rule_configs for this ruleset
                 all_rule_configs = RPMDataset.generate_rule_configs(rule_to_attribute, num_cols, attribute_to_values, fallback_sample_size=min_configs_per_ruleset, max_num_configs=1000)
-                rule_configs = random.sample(all_rule_configs, k=min(len(all_rule_configs), max(min_configs_per_ruleset, int((min_configs_per_ruleset * ruleset_breadth) / len(all_rule_configs)))))
+                rule_configs = random.sample(all_rule_configs, k=min(len(all_rule_configs), max(min_configs_per_ruleset, int((max_num_problems_per_num_rules / len(rulesets)) + 0.99))))
 
                 # Go through all possible configs for the given ruleset
                 for rule_config in rule_configs:
                     # Generate the Text RPM problem and format it for the dataset
-                    # TODO: Make sure that generation can handle various dependency orders etc.
                     example = RPMDataset.generate_and_format_problem(num_rows, 
                                                                      num_cols, 
                                                                      attributes, 
@@ -605,26 +669,30 @@ def main():
     #     meta_rules=['general_cycle']
     # )
 
-    # # Binary rule dataset generation example
-    # RPMDataset.generate_dataset(
-    #     max_num_rules=6,
-    #     num_rows=5,
-    #     num_cols=5,
-    #     rule_constructs={},
-    #     valid_rules=[],
-    #     meta_rules=['general_cycle', 'nary'],
-    #     default_alphabet_type='num',
-    #     dataset_id='v5'
-    # )
-
-    # Exotic alphabet generation example
+    # Binary rule dataset generation example
     RPMDataset.generate_dataset(
-        max_num_rules=5,
-        num_rows=3,
-        num_cols=3,
-        attribute_alphabet=[['!', '@', '#'], ['$', '%', '^'], ['&', '-', '='], ['+', '>', '<'], ['/', '|', '~']],
-        dataset_id='twist'
+        max_num_rules=6,
+        num_rows=5,
+        num_cols=5,
+        rule_constructs={},
+        valid_rules=[],
+        meta_rules=[
+            'general_cycle', 
+            'general_cycle2', 
+            'nary'
+        ],
+        default_alphabet_type='num',
+        dataset_id='v6'
     )
+
+    # # Exotic alphabet generation example
+    # RPMDataset.generate_dataset(
+    #     max_num_rules=5,
+    #     num_rows=3,
+    #     num_cols=3,
+    #     attribute_alphabet=[['!', '@', '#'], ['$', '%', '^'], ['&', '-', '='], ['+', '>', '<'], ['/', '|', '~']],
+    #     dataset_id='twist'
+    # )
 
 
 if __name__ == '__main__':
