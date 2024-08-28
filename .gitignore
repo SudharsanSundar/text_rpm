@@ -7,6 +7,12 @@ v4_results/
 v5_results_cleaned/
 v5_results_analysis/
 v5_results/
+v6-1_results_cleaned/
+v6-1_results_analysis/
+v6-1_results/
+v6-2_results_cleaned/
+v6-2_results_analysis/
+v6-2_results/
 tokenization_vis/
 eval_runs_details/
 datasets/

@@ -670,20 +670,20 @@ def main():
     # )
 
     # Binary rule dataset generation example
-    RPMDataset.generate_dataset(
-        max_num_rules=6,
-        num_rows=5,
-        num_cols=5,
-        rule_constructs={},
-        valid_rules=[],
-        meta_rules=[
-            'general_cycle', 
-            'general_cycle2', 
-            'nary'
-        ],
-        default_alphabet_type='num',
-        dataset_id='v6'
-    )
+    # RPMDataset.generate_dataset(
+    #     max_num_rules=6,
+    #     num_rows=5,
+    #     num_cols=5,
+    #     rule_constructs={},
+    #     valid_rules=[],
+    #     meta_rules=[
+    #         'general_cycle', 
+    #         'general_cycle2', 
+    #         'nary'
+    #     ],
+    #     default_alphabet_type='num',
+    #     dataset_id='v6'
+    # )
 
     # # Exotic alphabet generation example
     # RPMDataset.generate_dataset(
@@ -693,6 +693,37 @@ def main():
     #     attribute_alphabet=[['!', '@', '#'], ['$', '%', '^'], ['&', '-', '='], ['+', '>', '<'], ['/', '|', '~']],
     #     dataset_id='twist'
     # )
+
+    # # Full dataset with all bells and whistles
+    RPMDataset.generate_dataset(
+        max_num_rules=7,
+        num_rows=3,
+        num_cols=3,
+        rule_constructs={'diagonals': Diagonals},
+        valid_rules=['diagonals'],
+        meta_rules=[
+            'general_cycle', 
+            'general_cycle2', 
+            'nary'
+        ],
+        default_alphabet_type='num',
+        dataset_id='v6-1'
+    )
+
+    RPMDataset.generate_dataset(
+        max_num_rules=7,
+        num_rows=5,
+        num_cols=5,
+        rule_constructs={'diagonals': Diagonals},
+        valid_rules=['diagonals'],
+        meta_rules=[
+            'general_cycle', 
+            'general_cycle2', 
+            'nary'
+        ],
+        default_alphabet_type='num',
+        dataset_id='v6-2'
+    )
 
 
 if __name__ == '__main__':

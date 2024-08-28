@@ -329,8 +329,12 @@ def generate_all_cycle_rules(attr_names=None, n=5, l=5, balance_with_binary=True
         )
     
     if balance_with_binary:
-        kept_cycles = random.sample(list(general_cycle_rules.keys()), k=int(len(generate_nary_rules(attr_names=None, n=n, l=n, a_len=l, b_len=l)) * balance_factor))
+        num_nary_rules = len(generate_nary_rules(attr_names=None, n=n, l=n, a_len=l, b_len=l)) 
+        num_orig_rules = len(general_cycle_rules)
+        kept_cycles = random.sample(list(general_cycle_rules.keys()), k=min(len(general_cycle_rules.keys()), int(num_nary_rules * balance_factor)))
         general_cycle_rules = {key: general_cycle_rules[key] for key in kept_cycles}
+    
+        print(f'generated {len(general_cycle_rules)} general cycle rules, given {num_nary_rules} nary rules ({num_nary_rules * balance_factor} factor multiplied) and {num_orig_rules} base rules')
     
     return general_cycle_rules
 
@@ -355,10 +359,15 @@ def generate_all_cycle2_rules(attr_names=None, n=5, l=5, balance_with_binary=Tru
             num_cols=l,
             rel_path=path
         )
+        print(i, path)
     
     if balance_with_binary:
-        kept_cycles = random.sample(list(general_cycle_rules.keys()), k=int(len(generate_nary_rules(attr_names=None, n=n, l=n, a_len=l, b_len=l)) * balance_factor))
+        num_nary_rules = len(generate_nary_rules(attr_names=None, n=n, l=n, a_len=l, b_len=l)) 
+        num_orig_rules = len(general_cycle_rules)
+        kept_cycles = random.sample(list(general_cycle_rules.keys()), k=min(len(general_cycle_rules.keys()), int(num_nary_rules * balance_factor)))
         general_cycle_rules = {key: general_cycle_rules[key] for key in kept_cycles}
+
+        print(f'generated {len(general_cycle_rules)} general cycle rules, given {num_nary_rules} nary rules ({num_nary_rules * balance_factor} factor multiplied) and {num_orig_rules} base rules')
     
     return general_cycle_rules
 
@@ -583,8 +592,8 @@ def main():
     # for row in test_problem.grid:
     #     print(row)
     
-    print(len(generate_nary_rules(None, n=5, l=5, a_len=5, nary=2, b_len=5)))
-    print(len(generate_all_cycle_rules(None, n=5, l=5)))
+    # print(len(generate_nary_rules(None, n=5, l=5, a_len=5, nary=2, b_len=5)))
+    print(len(generate_all_cycle2_rules(None, n=3, l=3)))
 
 
 if __name__ == '__main__':

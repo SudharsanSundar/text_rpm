@@ -67,6 +67,47 @@ evaled_model_fps3 = [
 ]
 evaled_models3 = [fp.split('/')[-1] for fp in evaled_model_fps3]
 
+evaled_model_fps4 = [
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", ##
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct", ##
+    "/data/public_models/huggingface/meta-llama/Llama-2-13b-chat-hf", ##
+    "/data/public_models/huggingface/meta-llama/Llama-2-7b-chat-hf", ##
+    "/data/public_models/huggingface/mistralai/Mistral-7B-Instruct-v0.3", ##
+    "/data/public_models/huggingface/Qwen/Qwen1.5-0.5B-Chat", ##
+    "/data/public_models/huggingface/Qwen/Qwen1.5-1.8B-Chat", ## JUST WANT TO SEE BEHAVIOR!!!
+    "/data/public_models/huggingface/Qwen/Qwen1.5-4B-Chat", ##
+    # "/data/public_models/huggingface/tiiuae/falcon-7b-instruct", ## JUST WANT TO SEE BEHAVIOR!!!
+    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-7b-chat", ##
+    "/data/public_models/huggingface/google/gemma-1.1-2b-it", ##
+    "/data/public_models/huggingface/google/gemma-1.1-7b-it", ##
+    "/data/public_models/huggingface/01-ai/Yi-6B-Chat", ##
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-70B-Instruct", ##
+    "/data/public_models/huggingface/meta-llama/Llama-2-70b-chat-hf", ##
+    "/data/public_models/huggingface/mistralai/Mixtral-8x7B-Instruct-v0.1", ##  #
+    "/data/public_models/huggingface/Qwen/Qwen1.5-32B-Chat", ## 
+    "/data/public_models/huggingface/Qwen/Qwen1.5-72B-Chat", ##
+    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-67b-chat", ## 
+    "/data/public_models/huggingface/01-ai/Yi-34B-Chat", ##
+]
+evaled_models4 = [fp.split('/')[-1] for fp in evaled_model_fps4]
+
+evaled_model_fps5 = [
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3.1-8B-Instruct", ##
+    "/data/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct", ##
+    "/data/public_models/huggingface/meta-llama/Llama-2-13b-chat-hf", ##
+    "/data/public_models/huggingface/meta-llama/Llama-2-7b-chat-hf", ##
+    "/data/public_models/huggingface/mistralai/Mistral-7B-Instruct-v0.3", ##
+    "/data/public_models/huggingface/Qwen/Qwen1.5-0.5B-Chat", ##
+    "/data/public_models/huggingface/Qwen/Qwen1.5-1.8B-Chat", ## JUST WANT TO SEE BEHAVIOR!!!
+    "/data/public_models/huggingface/Qwen/Qwen1.5-4B-Chat", ##
+    "/data/public_models/huggingface/tiiuae/falcon-7b-instruct", ## JUST WANT TO SEE BEHAVIOR!!!
+    "/data/public_models/huggingface/deepseek-ai/deepseek-llm-7b-chat", ##
+    "/data/public_models/huggingface/google/gemma-1.1-2b-it", ##
+    "/data/public_models/huggingface/google/gemma-1.1-7b-it", ##
+    "/data/public_models/huggingface/01-ai/Yi-6B-Chat", ##
+]
+evaled_models5 = [fp.split('/')[-1] for fp in evaled_model_fps5]
+
 model_to_param_count = {
   "Meta-Llama-3-70B-Instruct": "70B",
   "Meta-Llama-3-8B-Instruct": "8B",
@@ -125,60 +166,60 @@ model_to_tokens_seen = {
 }
 
 '''
-{-7.6: 'Qwen1.5-0.5B-Chat',
- -4.54: 'Qwen1.5-1.8B-Chat',
- -4.07: 'gemma-1.1-2b-it',              ====
- -3.68: 'falcon-7b-instruct',
- -3.44: 'Qwen1.5-4B-Chat',
- -2.34: 'Qwen1.5-7B-Chat',
- -1.85: 'Llama-2-7b-chat-hf',
- -1.12: 'gemma-1.1-7b-it',              ====
- -0.76: 'Llama-2-13b-chat-hf',
- -0.67: 'Yi-6B-Chat',                   ====
+{-7.6: 'Qwen1.5-0.5B-Chat',     x
+ -4.54: 'Qwen1.5-1.8B-Chat',       x
+ -4.07: 'gemma-1.1-2b-it',      x        
+ -3.68: 'falcon-7b-instruct',   x
+ -3.44: 'Qwen1.5-4B-Chat',  x
+ -2.34: 'Qwen1.5-7B-Chat',  x
+ -1.85: 'Llama-2-7b-chat-hf',   x
+ -1.12: 'gemma-1.1-7b-it',      x        
+ -0.76: 'Llama-2-13b-chat-hf',  x
+ -0.67: 'Yi-6B-Chat',              x     
  -0.66: 'Qwen1.5-14B-Chat',
- -0.62: 'deepseek-llm-7b-chat',         ====
+ -0.62: 'deepseek-llm-7b-chat',        x 
  0.56: 'falcon-40b-instruct',
- 0.73: 'Mistral-7B-Instruct-v0.2',
+ 0.73: 'Mistral-7B-Instruct-v0.2',      x
  0.74: 'Qwen1.5-72B-Chat',
  0.94: 'Qwen1.5-32B-Chat',
- 1.13: 'Meta-Llama-3-8B-Instruct',      ====
+ 1.13: 'Meta-Llama-3-8B-Instruct',      x
  1.21: 'Llama-2-70b-chat-hf',
  1.71: 'Yi-34B-Chat',
  2.43: 'Qwen1.5-110B-Chat',
  2.58: 'falcon-180B-chat',
  2.91: 'deepseek-llm-67b-chat',
- 3.36: 'Mixtral-8x7B-Instruct-v0.1',    ====x r
+ 3.36: 'Mixtral-8x7B-Instruct-v0.1',    
  3.6: 'dbrx-instruct',
- 4.57: 'Meta-Llama-3-70B-Instruct',     ====x r
+ 4.57: 'Meta-Llama-3-70B-Instruct',     
  4.87: 'Mixtral-8x22B-Instruct-v0.1'}
 '''
 model_to_gscore = {
-    'Qwen1.5-0.5B-Chat': -7.60,
-    'Qwen1.5-1.8B-Chat': -4.54,
-    'gemma-1.1-2b-it': -4.07,
-    'falcon-7b-instruct': -3.68,
-    'Qwen1.5-4B-Chat': -3.44,
-    'Qwen1.5-7B-Chat': -2.34,
-    'Llama-2-7b-chat-hf': -1.85,
-    'gemma-1.1-7b-it': -1.12,
-    'Llama-2-13b-chat-hf': -0.76,
-    'Yi-6B-Chat': -0.67,
-    'Qwen1.5-14B-Chat': -0.66,
-    'deepseek-llm-7b-chat': -0.62,
-    'falcon-40b-instruct': 0.56,
-    'Mistral-7B-Instruct-v0.2': 0.73,
-    'Qwen1.5-72B-Chat': 0.74,
-    'Qwen1.5-32B-Chat': 0.94,
-    'Meta-Llama-3-8B-Instruct': 1.13,
-    'Llama-2-70b-chat-hf': 1.21,
-    'Yi-34B-Chat': 1.71,
-    'Qwen1.5-110B-Chat': 2.43,
-    'falcon-180B-chat': 2.58,
-    'deepseek-llm-67b-chat': 2.91,
-    'Mixtral-8x7B-Instruct-v0.1': 3.36,
-    'dbrx-instruct': 3.60,
-    'Meta-Llama-3-70B-Instruct': 4.57,
-    'Mixtral-8x22B-Instruct-v0.1': 4.87
+    'Qwen1.5-0.5B-Chat': -7.60, #
+    'Qwen1.5-1.8B-Chat': -4.54, #
+    'gemma-1.1-2b-it': -4.07,   #
+    'falcon-7b-instruct': -3.68, #
+    'Qwen1.5-4B-Chat': -3.44, #
+    'Qwen1.5-7B-Chat': -2.34, ####### "/data/public_models/huggingface/Qwen/Qwen1.5-7B-Chat"
+    'Llama-2-7b-chat-hf': -1.85, #
+    'gemma-1.1-7b-it': -1.12, #
+    'Llama-2-13b-chat-hf': -0.76, #
+    'Yi-6B-Chat': -0.67, #
+    'Qwen1.5-14B-Chat': -0.66, ####### "/data/public_models/huggingface/Qwen/Qwen1.5-14B-Chat"
+    'deepseek-llm-7b-chat': -0.62, #
+    'falcon-40b-instruct': 0.56, #?
+    'Mistral-7B-Instruct-v0.2': 0.73, #
+    'Qwen1.5-72B-Chat': 0.74, ####### "/data/public_models/huggingface/Qwen/Qwen1.5-72B-Chat"
+    'Qwen1.5-32B-Chat': 0.94, ####### "/data/public_models/huggingface/Qwen/Qwen1.5-32B-Chat"
+    'Meta-Llama-3-8B-Instruct': 1.13, #
+    'Llama-2-70b-chat-hf': 1.21, #
+    'Yi-34B-Chat': 1.71, #
+    'Qwen1.5-110B-Chat': 2.43, ####### "/data/public_models/huggingface/Qwen/Qwen1.5-110B-Chat"
+    'falcon-180B-chat': 2.58, #?
+    'deepseek-llm-67b-chat': 2.91, #
+    'Mixtral-8x7B-Instruct-v0.1': 3.36, #
+    'dbrx-instruct': 3.60, ####### "/data/public_models/huggingface/databricks/dbrx-instruct"
+    'Meta-Llama-3-70B-Instruct': 4.57, #
+    'Mixtral-8x22B-Instruct-v0.1': 4.87 #?
 }
 
 model_to_values = {
@@ -390,7 +431,10 @@ model_to_values = {
     },
     "google-gemma-2-9b-it": {},
     "gpt-4o-mini": {},
-    "gemma-2-27b-it": {}
+    "gemma-2-27b-it": {},
+    "Meta-Llama-3.1-8B-Instruct": {},
+    "Qwen1.5-32B-Chat": {},
+    "Qwen1.5-72B-Chat": {}
 }
 # print(set(model_to_param_count.keys()) - set(model_to_values.keys()))
 for key in model_to_param_count.keys():
@@ -802,6 +846,7 @@ def find_capabilities_correlations(models=evaled_models,
     plt.title(f'Variation of TextRPM performance over {comparison_data}')
     plt.xlabel(comparison_data)
     plt.ylabel(f'text_rpm_acc (num_rules={mode}) (logged)')
+    # plt.ylabel(f'text_rpm_acc (num_rules={mode})')
 
     plt.savefig(f'{save_folder}{comparison_data}_vs_textrpm_acc_log.png', dpi=300)
 
@@ -810,6 +855,7 @@ def find_capabilities_correlations(models=evaled_models,
     corr2, _ = pearsonr(comparison_vals, textrpm_vals)
     corr3, pval = spearmanr(a=comparison_vals, b=textrpm_vals)
     print(f'Pearson correlation coeff between {comparison_data} and text RPM acc (LOGGED): {corr} (np), {corr2} (scipy) | Spearman: {corr3} / pval {pval} | R^2: {r2} (skl)')
+    # print(f'Pearson correlation coeff between {comparison_data} and text RPM acc: {corr} (np), {corr2} (scipy) | Spearman: {corr3} / pval {pval} | R^2: {r2} (skl)')
 
     plt.show()
     plt.close()
@@ -882,12 +928,16 @@ def main():
     versions = [
         # 'v2',
         # 'v4',
-        'v5'
+        # 'v5',
+        'v6-1',
+        # 'v6-2'
     ]
     evaled_models_mapping = {
         'v2': evaled_models,
         'v4': evaled_models2,
-        'v5': evaled_models3
+        'v5': evaled_models3,
+        'v6-1': evaled_models4,
+        'v6-2': evaled_models5
     }
     do_cleaning = False
     do_analysis = False
